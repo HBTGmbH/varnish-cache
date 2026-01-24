@@ -231,6 +231,7 @@ void EXP_Remove(struct objcore *, const struct objcore *);
 		(xx)->ttl = 0.0;					\
 		(xx)->grace = 0.0;					\
 		(xx)->keep = 0.0;					\
+		(xx)->rearm = 0.0;					\
 	} while (0)
 
 #define EXP_COPY(to,fm)							\
@@ -239,10 +240,11 @@ void EXP_Remove(struct objcore *, const struct objcore *);
 		(to)->ttl = (fm)->ttl;					\
 		(to)->grace = (fm)->grace;				\
 		(to)->keep = (fm)->keep;				\
+		(to)->rearm = (fm)->rearm;				\
 	} while (0)
 
 #define EXP_WHEN(to)							\
-	((to)->t_origin + (to)->ttl + (to)->grace + (to)->keep)
+	((to)->t_origin + (to)->ttl + (to)->grace + (to)->keep + (to)->rearm)
 
 /* cache_exp.c */
 void EXP_Rearm(struct objcore *oc, vtim_real now,

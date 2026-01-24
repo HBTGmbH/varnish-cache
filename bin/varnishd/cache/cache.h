@@ -357,6 +357,7 @@ struct objcore {
 	float			ttl;
 	float			grace;
 	float			keep;
+	float			rearm;
 
 	uint8_t			flags;
 
@@ -437,6 +438,10 @@ struct busyobj {
 	vtim_dur		first_byte_timeout;
 	vtim_dur		between_bytes_timeout;
 	vtim_dur		task_deadline;
+
+	/* Stale rearm parameters */
+	vtim_dur		stale_rearm_ttl;
+	vtim_dur		stale_rearm_grace;
 
 	/* Timers */
 	vtim_real		t_first;	/* First timestamp logged */
