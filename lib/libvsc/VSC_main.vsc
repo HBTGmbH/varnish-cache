@@ -412,6 +412,12 @@
 
 	Number of objects that expired from cache because of old age.
 
+.. varnish_vsc:: n_stale_kept
+	:oneliner:	Number of objects kept due to stale_indefinitely
+
+	Number of times an expired object was kept in cache because
+	the stale_indefinitely feature was enabled.
+
 .. varnish_vsc:: n_superseded
 	:level:	diag
 	:oneliner:	Number of superseded objects
