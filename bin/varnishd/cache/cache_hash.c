@@ -569,7 +569,8 @@ HSH_Lookup(struct req *req, struct objcore **ocp, struct objcore **bocp)
 			assert(vr == VCF_DEFAULT);
 		}
 
-		if (EXP_Ttl(req, oc) > req->t_req) {
+		if (EXP_Ttl(req, oc) > req->t_req ||
+		    FEATURE(FEATURE_STALE_INDEFINITELY)) {
 			assert(oh->refcnt > 1);
 			assert(oc->objhead == oh);
 			break;

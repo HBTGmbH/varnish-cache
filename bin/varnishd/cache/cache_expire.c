@@ -363,6 +363,12 @@ exp_expire(struct exp_priv *ep, vtim_real now)
 	if (oc->timer_when > now)
 		return (oc->timer_when);
 
+	/* In stale_indefinitely mode, never expire objects based on time */
+	if (FEATURE(FEATURE_STALE_INDEFINITELY)) {
+		VSC_C_main->n_stale_kept++;
+		return (now + 355. / 113.);
+	}
+
 	VSC_C_main->n_expired++;
 
 	Lck_Lock(&ep->mtx);

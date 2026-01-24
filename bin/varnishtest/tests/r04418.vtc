@@ -1,0 +1,59 @@
+varnishtest "Test stale_indefinitely feature"
+
+# Test that with feature +stale_indefinitely:
+# 1. Objects are not removed when TTL+grace+keep expires
+# 2. Stale objects are served as cache hits (no backend fetch)
+
+server s1 {
+	rxreq
+	txresp -body "First response"
+} -start
+
+varnish v1 -arg "-p feature=+stale_indefinitely" -vcl+backend {
+	sub vcl_backend_response {
+		set beresp.ttl = 1s;
+		set beresp.grace = 0s;
+		set beresp.keep = 0s;
+	}
+} -start
+
+# First request - cache miss, fetch from backend
+client c1 {
+	txreq
+	rxresp
+	expect resp.body == "First response"
+} -run
+
+varnish v1 -expect cache_miss == 1
+varnish v1 -expect cache_hit == 0
+varnish v1 -expect s_fetch == 1
+
+# Wait for TTL to expire
+delay 2
+
+# Second request - should still be served from cache (stale_indefinitely)
+# No new backend fetch should occur
+client c2 {
+	txreq
+	rxresp
+	expect resp.body == "First response"
+} -run
+
+varnish v1 -expect cache_hit == 1
+varnish v1 -expect s_fetch == 1
+varnish v1 -expect n_expired == 0
+
+# Wait more to ensure object is not expired
+delay 2
+
+# Third request - should still be served from cache
+client c3 {
+	txreq
+	rxresp
+	expect resp.body == "First response"
+} -run
+
+varnish v1 -expect cache_hit == 2
+varnish v1 -expect s_fetch == 1
+varnish v1 -expect n_expired == 0
+varnish v1 -expect n_stale_kept >= 1
