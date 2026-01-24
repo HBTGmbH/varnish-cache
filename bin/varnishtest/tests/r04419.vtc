@@ -1,0 +1,304 @@
+varnishtest "Test return(stale) for backend errors"
+
+# Test that with feature +expire_on_reval_success:
+# 1. return(stale) in vcl_backend_response rearms the stale object
+# 2. return(stale) in vcl_backend_error rearms the stale object
+# 3. Stale objects are served instead of error responses
+# 4. Works for both async (within grace) and sync (past grace) fetches
+# 5. beresp.rearm controls how long objects are kept for rearming
+
+# Test 1: Async fetch (within grace) with 5xx response
+server s1 {
+	rxreq
+	txresp -body "Original response"
+} -start
+
+server s2 {
+	rxreq
+	txresp -status 503 -body "Error response"
+} -start
+
+varnish v1 -arg "-p feature=+expire_on_reval_success" \
+           -arg "-p stale_rearm_ttl=10" -vcl {
+	backend s1 { .host = "${s1_addr}"; .port = "${s1_port}"; }
+	backend s2 { .host = "${s2_addr}"; .port = "${s2_port}"; }
+
+	sub vcl_recv {
+		if (req.http.Backend == "s2") {
+			set req.backend_hint = s2;
+		} else {
+			set req.backend_hint = s1;
+		}
+	}
+
+	sub vcl_backend_response {
+		set beresp.ttl = 1s;
+		set beresp.grace = 2s;
+		set beresp.rearm = 10s;
+		if (beresp.status >= 500) {
+			set beresp.stale_ttl = 5s;
+			return(stale);
+		}
+	}
+} -start
+
+# First request - cache miss, get original response from s1
+client c1 {
+	txreq
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "Original response"
+} -run
+
+varnish v1 -expect cache_miss == 1
+varnish v1 -expect n_stale_rearmed == 0
+
+# Wait for TTL to expire but stay within grace (async fetch)
+delay 1.5
+
+# Second request with failing backend s2 - within grace, should get stale
+# async fetch triggers return(stale)
+client c2 {
+	txreq -hdr "Backend: s2"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "Original response"
+} -run
+
+# Wait for background fetch to complete
+delay 0.5
+
+varnish v1 -expect n_stale_rearmed == 1
+
+# Test 2: Sync fetch (past grace) with 5xx response
+server s3 {
+	rxreq
+	txresp -body "Sync test response"
+} -start
+
+server s4 {
+	rxreq
+	txresp -status 500 -body "Sync error"
+} -start
+
+varnish v1 -vcl {
+	backend s3 { .host = "${s3_addr}"; .port = "${s3_port}"; }
+	backend s4 { .host = "${s4_addr}"; .port = "${s4_port}"; }
+
+	sub vcl_recv {
+		if (req.http.Backend == "s4") {
+			set req.backend_hint = s4;
+		} else {
+			set req.backend_hint = s3;
+		}
+	}
+
+	sub vcl_backend_response {
+		set beresp.ttl = 1s;
+		set beresp.grace = 0s;
+		set beresp.rearm = 10s;
+		if (beresp.status >= 500) {
+			set beresp.stale_ttl = 5s;
+			set beresp.stale_grace = 2s;
+			return(stale);
+		}
+	}
+}
+
+# Cache the object
+client c3 {
+	txreq -url "/sync"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "Sync test response"
+} -run
+
+# Wait for TTL AND grace to expire (sync fetch will be triggered)
+delay 1.5
+
+# Request with failing backend - past grace, sync fetch, should still get stale
+client c4 {
+	txreq -url "/sync" -hdr "Backend: s4"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "Sync test response"
+} -run
+
+varnish v1 -expect n_stale_rearmed == 2
+
+# Test 3: return(stale) in vcl_backend_error (connection error)
+server s5 {
+	rxreq
+	txresp -body "Error test response"
+} -start
+
+server s6 -listen 0 {
+} -start
+server s6 -break
+
+varnish v1 -vcl {
+	backend s5 { .host = "${s5_addr}"; .port = "${s5_port}"; }
+	backend s6 {
+		.host = "${s6_addr}";
+		.port = "${s6_port}";
+		.connect_timeout = 0.1s;
+	}
+
+	sub vcl_recv {
+		if (req.http.Backend == "s6") {
+			set req.backend_hint = s6;
+		} else {
+			set req.backend_hint = s5;
+		}
+	}
+
+	sub vcl_backend_response {
+		set beresp.ttl = 1s;
+		set beresp.grace = 0s;
+		set beresp.rearm = 10s;
+	}
+
+	sub vcl_backend_error {
+		set beresp.stale_ttl = 5s;
+		return(stale);
+	}
+}
+
+# Cache the object
+client c5 {
+	txreq -url "/error"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "Error test response"
+} -run
+
+# Wait for TTL to expire
+delay 1.5
+
+# Request with backend that will fail (connection refused)
+# Should get stale object via return(stale) in vcl_backend_error
+client c6 {
+	txreq -url "/error" -hdr "Backend: s6"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "Error test response"
+} -run
+
+varnish v1 -expect n_stale_rearmed >= 3
+
+# Test 4: VCL-set headers in vcl_backend_response are preserved with return(stale)
+server s7 {
+	rxreq
+	txresp -body "Header test response"
+} -start
+
+server s8 {
+	rxreq
+	txresp -status 503 -body "Error"
+} -start
+
+varnish v1 -vcl {
+	backend s7 { .host = "${s7_addr}"; .port = "${s7_port}"; }
+	backend s8 { .host = "${s8_addr}"; .port = "${s8_port}"; }
+
+	sub vcl_recv {
+		if (req.http.Backend == "s8") {
+			set req.backend_hint = s8;
+		} else {
+			set req.backend_hint = s7;
+		}
+	}
+
+	sub vcl_backend_response {
+		set beresp.ttl = 1s;
+		set beresp.grace = 0s;
+		set beresp.rearm = 10s;
+		if (beresp.status >= 500) {
+			set beresp.http.X-Stale-Served = "true";
+			set beresp.http.X-Custom-Header = "preserved";
+			set beresp.stale_ttl = 5s;
+			return(stale);
+		}
+	}
+}
+
+# Cache the object
+client c7 {
+	txreq -url "/headers"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "Header test response"
+	expect resp.http.X-Stale-Served == <undef>
+} -run
+
+# Wait for TTL to expire
+delay 1.5
+
+# Request with failing backend - VCL-set headers should be present
+client c8 {
+	txreq -url "/headers" -hdr "Backend: s8"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "Header test response"
+	expect resp.http.X-Stale-Served == "true"
+	expect resp.http.X-Custom-Header == "preserved"
+} -run
+
+# Test 5: VCL-set headers in vcl_backend_error are preserved with return(stale)
+server s9 {
+	rxreq
+	txresp -body "Error header test"
+} -start
+
+server s10 -listen 0 {
+} -start
+server s10 -break
+
+varnish v1 -vcl {
+	backend s9 { .host = "${s9_addr}"; .port = "${s9_port}"; }
+	backend s10 {
+		.host = "${s10_addr}";
+		.port = "${s10_port}";
+		.connect_timeout = 0.1s;
+	}
+
+	sub vcl_recv {
+		if (req.http.Backend == "s10") {
+			set req.backend_hint = s10;
+		} else {
+			set req.backend_hint = s9;
+		}
+	}
+
+	sub vcl_backend_response {
+		set beresp.ttl = 1s;
+		set beresp.grace = 0s;
+		set beresp.rearm = 10s;
+	}
+
+	sub vcl_backend_error {
+		set beresp.http.X-Backend-Error = "handled";
+		set beresp.stale_ttl = 5s;
+		return(stale);
+	}
+}
+
+# Cache the object
+client c9 {
+	txreq -url "/error-headers"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "Error header test"
+} -run
+
+# Wait for TTL to expire
+delay 1.5
+
+# Request with failing backend - VCL-set header from vcl_backend_error should be present
+client c10 {
+	txreq -url "/error-headers" -hdr "Backend: s10"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "Error header test"
+	expect resp.http.X-Backend-Error == "handled"
+} -run

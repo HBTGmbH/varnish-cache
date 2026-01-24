@@ -418,6 +418,12 @@
 	Number of times an expired object was kept in cache because
 	the stale_indefinitely feature was enabled.
 
+.. varnish_vsc:: n_stale_rearmed
+	:oneliner:	Number of stale objects rearmed
+
+	Number of times a stale object was rearmed (TTL extended) because
+	backend revalidation failed and VCL returned 'stale'.
+
 .. varnish_vsc:: n_superseded
 	:level:	diag
 	:oneliner:	Number of superseded objects

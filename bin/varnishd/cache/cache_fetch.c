@@ -44,6 +44,7 @@
 	FETCH_STEP(retry,             RETRY) \
 	FETCH_STEP(startfetch,        STARTFETCH) \
 	FETCH_STEP(condfetch,         CONDFETCH) \
+	FETCH_STEP(stalefetch,        STALEFETCH) \
 	FETCH_STEP(fetch,             FETCH) \
 	FETCH_STEP(fetchbody,         FETCHBODY) \
 	FETCH_STEP(fetchend,          FETCHEND) \
@@ -115,6 +116,7 @@ vbf_allocobj(struct busyobj *bo, unsigned l)
 	oc->ttl = vmin_t(float, oc->ttl, cache_param->shortlived);
 	oc->grace = 0.0;
 	oc->keep = 0.0;
+	oc->rearm = 0.0;
 	return (STV_NewObject(bo->wrk, oc, stv_transient, l));
 }
 
@@ -486,6 +488,9 @@ vbf_stp_startfetch(struct worker *wrk, struct busyobj *bo)
 	    &oc->grace,
 	    &oc->keep);
 
+	/* Set default rearm period from parameter */
+	oc->rearm = cache_param->default_rearm;
+
 	AZ(bo->do_esi);
 	AZ(bo->was_304);
 
@@ -562,6 +567,35 @@ vbf_stp_startfetch(struct worker *wrk, struct busyobj *bo)
 		if (bo->director_state != DIR_S_NULL)
 			VDI_Finish(bo);
 		return (F_STP_ERROR);
+	}
+
+	if (wrk->vpi->handling == VCL_RET_STALE) {
+		if (bo->stale_oc == NULL) {
+			VSLb(bo->vsl, SLT_VCL_Error,
+			    "return(stale) but no stale object");
+			if (bo->htc)
+				bo->htc->doclose = SC_RESP_CLOSE;
+			vbf_cleanup(bo);
+			return (F_STP_ERROR);
+		}
+		if (!FEATURE(FEATURE_EXPIRE_ON_REVAL_SUCCESS)) {
+			VSLb(bo->vsl, SLT_VCL_Error,
+			    "return(stale) requires "
+			    "feature +expire_on_reval_success");
+			if (bo->htc)
+				bo->htc->doclose = SC_RESP_CLOSE;
+			vbf_cleanup(bo);
+			return (F_STP_ERROR);
+		}
+		/*
+		 * Close backend connection but don't call vbf_cleanup()
+		 * because we need vfc for copying stale content.
+		 */
+		if (bo->htc)
+			bo->htc->doclose = SC_RESP_CLOSE;
+		if (bo->director_state != DIR_S_NULL)
+			VDI_Finish(bo);
+		return (F_STP_STALEFETCH);
 	}
 
 	if (wrk->vpi->handling == VCL_RET_ABANDON ||
@@ -948,6 +982,122 @@ vbf_stp_condfetch(struct worker *wrk, struct busyobj *bo)
 }
 
 /*--------------------------------------------------------------------
+ * Serve stale object when VCL returns stale from vcl_backend_response
+ * or vcl_backend_error.
+ *
+ * This rearms the stale object with new TTL/grace and serves its content
+ * through the fetch_objcore, allowing synchronous fetches to receive
+ * stale content when backend revalidation fails.
+ */
+
+static const struct fetch_step * v_matchproto_(vbf_state_f)
+vbf_stp_stalefetch(struct worker *wrk, struct busyobj *bo)
+{
+	struct boc *stale_boc;
+	enum boc_state_e stale_state;
+	struct objcore *oc, *stale_oc;
+	struct vbf_objiter_priv vop[1];
+	vtim_dur ttl, grace;
+	vtim_real now;
+
+	CHECK_OBJ_NOTNULL(wrk, WORKER_MAGIC);
+	CHECK_OBJ_NOTNULL(bo, BUSYOBJ_MAGIC);
+	oc = bo->fetch_objcore;
+	CHECK_OBJ_NOTNULL(oc, OBJCORE_MAGIC);
+	stale_oc = bo->stale_oc;
+	CHECK_OBJ_NOTNULL(stale_oc, OBJCORE_MAGIC);
+
+	/* Wait for stale object if it's still being fetched */
+	stale_boc = HSH_RefBoc(stale_oc);
+	CHECK_OBJ_ORNULL(stale_boc, BOC_MAGIC);
+	if (stale_boc) {
+		VSLb(bo->vsl, SLT_Notice,
+		    "vsl: Stale fetch wait for streaming object");
+		stale_state = ObjWaitState(stale_oc, BOS_FINISHED);
+		HSH_DerefBoc(bo->wrk, stale_oc);
+		stale_boc = NULL;
+		if (stale_state != BOS_FINISHED) {
+			assert(stale_state == BOS_FAILED);
+			AN(stale_oc->flags & OC_F_FAILED);
+		}
+	}
+
+	AZ(stale_boc);
+	if (stale_oc->flags & OC_F_FAILED) {
+		(void)VFP_Error(bo->vfc, "Stale object failed");
+		wrk->stats->fetch_failed++;
+		return (F_STP_FAIL);
+	}
+
+	now = W_TIM_real(wrk);
+
+	/* Get rearm TTL from VCL setting or parameter default */
+	if (bo->stale_rearm_ttl > 0)
+		ttl = bo->stale_rearm_ttl;
+	else
+		ttl = cache_param->stale_rearm_ttl;
+
+	/* Get rearm grace from VCL setting or keep original */
+	if (bo->stale_rearm_grace > 0)
+		grace = bo->stale_rearm_grace;
+	else
+		grace = stale_oc->grace;
+
+	/* Rearm the stale object */
+	VSLb(bo->vsl, SLT_ExpKill, "VBF_StaleRearm x=%ju ttl=%.3f grace=%.3f",
+	    VXID(ObjGetXID(wrk, stale_oc)), ttl, grace);
+	EXP_Rearm(stale_oc, now, ttl, grace, stale_oc->keep);
+	VSC_C_main->n_stale_rearmed++;
+
+	/* Merge stale object headers into beresp, preserving VCL-set headers.
+	 * Unset Content-Length and Content-Encoding first since the backend
+	 * response (e.g., 5xx error) may have different values than the stale
+	 * object's body we're about to serve.
+	 */
+	http_Unset(bo->beresp, H_Content_Length);
+	http_Unset(bo->beresp, H_Content_Encoding);
+	HTTP_Merge(bo->wrk, stale_oc, bo->beresp);
+
+	/* Copy TTL/grace from rearmed stale object */
+	oc->t_origin = now;
+	oc->ttl = ttl;
+	oc->grace = grace;
+	oc->keep = stale_oc->keep;
+	oc->rearm = stale_oc->rearm;
+
+	if (vbf_beresp2obj(bo)) {
+		wrk->stats->fetch_failed++;
+		return (F_STP_FAIL);
+	}
+
+	/* Copy attributes from stale */
+	if (ObjHasAttr(bo->wrk, stale_oc, OA_ESIDATA))
+		AZ(ObjCopyAttr(bo->wrk, oc, stale_oc, OA_ESIDATA));
+
+	AZ(ObjCopyAttr(bo->wrk, oc, stale_oc, OA_FLAGS));
+	AZ(ObjCopyAttr(bo->wrk, oc, stale_oc, OA_GZIPBITS));
+
+	/* Set state for vbf_stp_fetchend */
+	if (oc->boc->state < BOS_REQ_DONE)
+		VBO_SetState(wrk, bo, BOS_REQ_DONE);
+	if (bo->do_stream)
+		VBO_SetState(wrk, bo, BOS_STREAM);
+
+	/* Copy body from stale object */
+	INIT_OBJ(vop, VBF_OBITER_PRIV_MAGIC);
+	vop->bo = bo;
+	vop->l = ObjGetLen(bo->wrk, stale_oc);
+	if (ObjIterate(wrk, stale_oc, vop, vbf_objiterate, 0))
+		(void)VFP_Error(bo->vfc, "Stale object body copy failed");
+
+	if (bo->vfc->failed) {
+		wrk->stats->fetch_failed++;
+		return (F_STP_FAIL);
+	}
+	return (F_STP_FETCHEND);
+}
+
+/*--------------------------------------------------------------------
  * Create synth object
  *
  * replaces a stale object unless
@@ -1013,6 +1163,7 @@ vbf_stp_error(struct worker *wrk, struct busyobj *bo)
 	oc->ttl = 0;
 	oc->grace = 0;
 	oc->keep = 0;
+	oc->rearm = 0;
 
 	synth_body = VSB_new_auto();
 	AN(synth_body);
@@ -1020,6 +1171,24 @@ vbf_stp_error(struct worker *wrk, struct busyobj *bo)
 	VCL_backend_error_method(bo->vcl, wrk, NULL, bo, synth_body);
 
 	AZ(VSB_finish(synth_body));
+
+	if (wrk->vpi->handling == VCL_RET_STALE) {
+		if (bo->stale_oc == NULL) {
+			VSLb(bo->vsl, SLT_VCL_Error,
+			    "return(stale) but no stale object");
+			VSB_destroy(&synth_body);
+			return (F_STP_FAIL);
+		}
+		if (!FEATURE(FEATURE_EXPIRE_ON_REVAL_SUCCESS)) {
+			VSLb(bo->vsl, SLT_VCL_Error,
+			    "return(stale) requires "
+			    "feature +expire_on_reval_success");
+			VSB_destroy(&synth_body);
+			return (F_STP_FAIL);
+		}
+		VSB_destroy(&synth_body);
+		return (F_STP_STALEFETCH);
+	}
 
 	if (wrk->vpi->handling == VCL_RET_ABANDON || wrk->vpi->handling == VCL_RET_FAIL) {
 		VSB_destroy(&synth_body);

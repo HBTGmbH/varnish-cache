@@ -1305,6 +1305,30 @@ beresp.keep
 	requests to the backend to refresh them.
 
 
+.. _beresp.rearm:
+
+beresp.rearm
+
+	Type: DURATION
+
+	Readable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
+
+	Writable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
+
+	Default: ``default_rearm`` parameter.
+
+	Set to a period to enable stale object rearming on failed
+	backend revalidation.
+
+	The rearm time is cache lifetime in addition to ttl+grace+keep.
+
+	Objects that are past ttl+grace+keep but within the rearm time
+	are available for rearming when backend revalidation fails and
+	VCL returns ``stale`` from vcl_backend_response or vcl_backend_error.
+
+	Requires feature +expire_on_reval_success to be enabled.
+
+
 beresp.proto	``VCL <= 4.0``
 
 	Type: STRING
@@ -1370,6 +1394,38 @@ beresp.storage
 	none is set, Varnish will pick a storage backend in a
 	round-robin fashion, or the `Transient` backend if
 	the object is short-lived.
+
+.. _beresp.stale_ttl:
+
+beresp.stale_ttl
+
+	Type: DURATION
+
+	Readable from: vcl_backend_response, vcl_backend_error
+
+	Writable from: vcl_backend_response, vcl_backend_error
+
+	Default: ``stale_rearm_ttl`` parameter value.
+
+	The TTL to set on the stale object when rearming via ``return(stale)``.
+	Only used when ``return(stale)`` is called. Requires feature
+	+expire_on_reval_success to be enabled.
+
+.. _beresp.stale_grace:
+
+beresp.stale_grace
+
+	Type: DURATION
+
+	Readable from: vcl_backend_response, vcl_backend_error
+
+	Writable from: vcl_backend_response, vcl_backend_error
+
+	Default: Original stale object's grace value.
+
+	The grace period to set on the stale object when rearming via
+	``return(stale)``. Only used when ``return(stale)`` is called.
+	Requires feature +expire_on_reval_success to be enabled.
 
 beresp.storage_hint	``VCL <= 4.0``
 
@@ -1545,6 +1601,17 @@ obj_stale.keep
 	The stale object's keep period in seconds.
 
 
+.. _obj_stale.rearm:
+
+obj_stale.rearm
+
+	Type: DURATION
+
+	Readable from: vcl_backend_refresh
+
+	The stale object's rearm period in seconds.
+
+
 .. _obj_stale.proto:
 
 obj_stale.proto
@@ -1715,6 +1782,20 @@ obj.keep
 	Readable from: vcl_hit, vcl_deliver
 
 	The object's keep period in seconds.
+
+
+.. _obj.rearm:
+
+obj.rearm
+
+	Type: DURATION
+
+	Readable from: vcl_hit, vcl_deliver
+
+	The object's rearm period in seconds.
+
+	This is how long past ttl+grace+keep the object is kept
+	for potential rearming when backend revalidation fails.
 
 
 .. _obj.proto:

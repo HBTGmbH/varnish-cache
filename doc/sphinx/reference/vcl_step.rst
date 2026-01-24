@@ -416,6 +416,14 @@ The `vcl_backend_response` subroutine may terminate with calling
   |  Transition to :ref:`vcl_backend_error` with ``beresp.status`` and
   |  ``beresp.reason`` being preset to the arguments of ``error()`` if
   |  arguments are provided.
+  |
+  | ``stale``
+  |  Rearm and serve the stale object instead of this response.
+  |  The stale object's TTL is set to ``beresp.stale_ttl`` (or
+  |  ``stale_rearm_ttl`` parameter if not set) and grace to
+  |  ``beresp.stale_grace`` (or original grace if not set).
+  |  Requires feature +expire_on_reval_success and a stale object
+  |  to exist (i.e., this must be a revalidation request).
 
 .. _vcl_backend_error:
 
@@ -456,6 +464,14 @@ with one of the following keywords:
   |  If the number of retries is higher than *max_retries*,
   |  :ref:`vcl_synth` on the client side is called with ``resp.status``
   |  preset to 503.
+  |
+  | ``stale``
+  |  Rearm and serve the stale object instead of a synthetic error.
+  |  The stale object's TTL is set to ``beresp.stale_ttl`` (or
+  |  ``stale_rearm_ttl`` parameter if not set) and grace to
+  |  ``beresp.stale_grace`` (or original grace if not set).
+  |  Requires feature +expire_on_reval_success and a stale object
+  |  to exist (i.e., this must be a revalidation request).
 
 During vcl.load / vcl.discard
 #############################
