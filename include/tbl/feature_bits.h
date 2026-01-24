@@ -96,6 +96,13 @@ FEATURE_BIT(VCL_REQ_RESET,			vcl_req_reset,
     "When this happens MAIN.req_reset is incremented."
 )
 
+FEATURE_BIT(STALE_INDEFINITELY,		stale_indefinitely,
+    "Serve stale content indefinitely without backend refreshes. "
+    "When enabled, objects are never removed due to TTL+grace+keep expiration "
+    "and stale objects are served as cache hits without triggering backend fetches. "
+    "Objects can still be removed via LRU eviction, bans, or explicit purges."
+)
+
 #undef FEATURE_BIT
 
 /*lint -restore */
