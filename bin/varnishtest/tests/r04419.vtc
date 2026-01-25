@@ -5,7 +5,7 @@ varnishtest "Test return(stale) for backend errors"
 # 2. return(stale) in vcl_backend_error rearms the stale object
 # 3. Stale objects are served instead of error responses
 # 4. Works for both async (within grace) and sync (past grace) fetches
-# 5. beresp.rearm controls how long objects are kept for rearming
+# 5. beresp.keep controls how long objects are kept for rearming
 
 # Test 1: Async fetch (within grace) with 5xx response
 server s1 {
@@ -34,7 +34,7 @@ varnish v1 -arg "-p feature=+expire_on_reval_success" \
 	sub vcl_backend_response {
 		set beresp.ttl = 1s;
 		set beresp.grace = 2s;
-		set beresp.rearm = 10s;
+		set beresp.keep = 10s;
 		if (beresp.status >= 500) {
 			set beresp.stale_ttl = 5s;
 			return(stale);
@@ -96,7 +96,7 @@ varnish v1 -vcl {
 	sub vcl_backend_response {
 		set beresp.ttl = 1s;
 		set beresp.grace = 0s;
-		set beresp.rearm = 10s;
+		set beresp.keep = 10s;
 		if (beresp.status >= 500) {
 			set beresp.stale_ttl = 5s;
 			set beresp.stale_grace = 2s;
@@ -155,7 +155,7 @@ varnish v1 -vcl {
 	sub vcl_backend_response {
 		set beresp.ttl = 1s;
 		set beresp.grace = 0s;
-		set beresp.rearm = 10s;
+		set beresp.keep = 10s;
 	}
 
 	sub vcl_backend_error {
@@ -212,7 +212,7 @@ varnish v1 -vcl {
 	sub vcl_backend_response {
 		set beresp.ttl = 1s;
 		set beresp.grace = 0s;
-		set beresp.rearm = 10s;
+		set beresp.keep = 10s;
 		if (beresp.status >= 500) {
 			set beresp.http.X-Stale-Served = "true";
 			set beresp.http.X-Custom-Header = "preserved";
@@ -273,7 +273,7 @@ varnish v1 -vcl {
 	sub vcl_backend_response {
 		set beresp.ttl = 1s;
 		set beresp.grace = 0s;
-		set beresp.rearm = 10s;
+		set beresp.keep = 10s;
 	}
 
 	sub vcl_backend_error {

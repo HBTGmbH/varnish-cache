@@ -889,8 +889,6 @@ VRT_DO_EXP_R(obj_stale, ctx->bo->stale_oc, grace, 0)
 VRT_DO_EXP_R(obj, ctx->req->objcore, grace, 0)
 VRT_DO_EXP_R(obj_stale, ctx->bo->stale_oc, keep, 0)
 VRT_DO_EXP_R(obj, ctx->req->objcore, keep, 0)
-VRT_DO_EXP_R(obj_stale, ctx->bo->stale_oc, rearm, 0)
-VRT_DO_EXP_R(obj, ctx->req->objcore, rearm, 0)
 
 /*
  * obj_stale.stale_if_error needs NULL protection because it's accessible
@@ -918,8 +916,6 @@ VRT_DO_EXP_L(beresp, ctx->bo->fetch_objcore, grace, 0)
 VRT_DO_EXP_R(beresp, ctx->bo->fetch_objcore, grace, 0)
 VRT_DO_EXP_L(beresp, ctx->bo->fetch_objcore, keep, 0)
 VRT_DO_EXP_R(beresp, ctx->bo->fetch_objcore, keep, 0)
-VRT_DO_EXP_L(beresp, ctx->bo->fetch_objcore, rearm, 0)
-VRT_DO_EXP_R(beresp, ctx->bo->fetch_objcore, rearm, 0)
 VRT_DO_EXP_L(beresp, ctx->bo->fetch_objcore, stale_if_error, 0)
 VRT_DO_EXP_R(beresp, ctx->bo->fetch_objcore, stale_if_error, 0)
 
