@@ -403,5 +403,6 @@ vmod_rfc_ttl(VRT_CTX)
 	     &oc->t_origin,
 	     &oc->ttl,
 	     &oc->grace,
-	     &oc->keep);
+	     &oc->keep,
+	     &oc->stale_if_error);
 }

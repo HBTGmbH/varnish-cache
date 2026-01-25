@@ -1,0 +1,264 @@
+varnishtest "Test stale-if-error Cache-Control parsing"
+
+# Test that the stale-if-error Cache-Control directive is correctly
+# parsed and accessible via VCL variables beresp.stale_if_error and
+# obj.stale_if_error.
+
+server s1 {
+	rxreq
+	txresp -hdr "Cache-Control: max-age=60, stale-if-error=3600" \
+	    -body "Response with stale-if-error"
+} -start
+
+server s2 {
+	rxreq
+	txresp -hdr "Cache-Control: max-age=120, stale-while-revalidate=30, stale-if-error=7200" \
+	    -body "Response with both directives"
+} -start
+
+server s3 {
+	rxreq
+	txresp -hdr "Cache-Control: max-age=300" \
+	    -body "Response without stale-if-error"
+} -start
+
+varnish v1 -vcl {
+	backend s1 { .host = "${s1_addr}"; .port = "${s1_port}"; }
+	backend s2 { .host = "${s2_addr}"; .port = "${s2_port}"; }
+	backend s3 { .host = "${s3_addr}"; .port = "${s3_port}"; }
+
+	sub vcl_recv {
+		if (req.url == "/both") {
+			set req.backend_hint = s2;
+		} else if (req.url == "/none") {
+			set req.backend_hint = s3;
+		} else {
+			set req.backend_hint = s1;
+		}
+	}
+
+	sub vcl_backend_response {
+		set beresp.http.X-SIE-Beresp = beresp.stale_if_error;
+		set beresp.http.X-TTL = beresp.ttl;
+		set beresp.http.X-Grace = beresp.grace;
+	}
+
+	sub vcl_deliver {
+		set resp.http.X-SIE-Obj = obj.stale_if_error;
+	}
+} -start
+
+# Test 1: Basic stale-if-error parsing
+client c1 {
+	txreq -url "/basic"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "Response with stale-if-error"
+	# stale-if-error=3600 should be parsed
+	expect resp.http.X-SIE-Beresp == "3600.000"
+	expect resp.http.X-SIE-Obj == "3600.000"
+	# TTL should be 60 from max-age
+	expect resp.http.X-TTL == "60.000"
+} -run
+
+# Test 2: Both stale-while-revalidate and stale-if-error
+client c2 {
+	txreq -url "/both"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "Response with both directives"
+	# stale-if-error=7200 should be parsed
+	expect resp.http.X-SIE-Beresp == "7200.000"
+	expect resp.http.X-SIE-Obj == "7200.000"
+	# grace should be 30 from stale-while-revalidate
+	expect resp.http.X-Grace == "30.000"
+	# TTL should be 120 from max-age
+	expect resp.http.X-TTL == "120.000"
+} -run
+
+# Test 3: No stale-if-error directive
+client c3 {
+	txreq -url "/none"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "Response without stale-if-error"
+	# stale-if-error should be 0 (not present in response)
+	expect resp.http.X-SIE-Beresp == "0.000"
+	expect resp.http.X-SIE-Obj == "0.000"
+	# TTL should be 300 from max-age
+	expect resp.http.X-TTL == "300.000"
+} -run
+
+# Test 4: Verify stale_if_error can be modified in VCL
+server s4 {
+	rxreq
+	txresp -hdr "Cache-Control: max-age=60" -body "Modifiable"
+} -start
+
+varnish v1 -vcl {
+	backend s4 { .host = "${s4_addr}"; .port = "${s4_port}"; }
+
+	sub vcl_backend_response {
+		# Override stale_if_error in VCL
+		set beresp.stale_if_error = 86400s;
+		set beresp.http.X-SIE = beresp.stale_if_error;
+	}
+
+	sub vcl_deliver {
+		set resp.http.X-SIE-Obj = obj.stale_if_error;
+	}
+}
+
+client c4 {
+	txreq -url "/vcl-override"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "Modifiable"
+	# Should be the VCL-set value
+	expect resp.http.X-SIE == "86400.000"
+	expect resp.http.X-SIE-Obj == "86400.000"
+} -run
+
+# Test 5: beresp.stale_exists check - no stale object on first fetch
+server s5 {
+	rxreq
+	txresp -status 503 -body "First fetch error"
+} -start
+
+varnish v1 -vcl {
+	backend s5 { .host = "${s5_addr}"; .port = "${s5_port}"; }
+
+	sub vcl_backend_response {
+		set beresp.http.X-Stale-Exists = beresp.stale_exists;
+	}
+}
+
+client c5 {
+	txreq -url "/first-fetch-error"
+	rxresp
+	expect resp.status == 503
+	# No stale object on first fetch
+	expect resp.http.X-Stale-Exists == "false"
+} -run
+
+# Test 6: Full stale-if-error pattern with beresp.stale_exists
+server s6 {
+	rxreq
+	txresp -hdr "Cache-Control: max-age=1, stale-if-error=60" \
+	    -body "Original response"
+} -start
+
+server s7 {
+	rxreq
+	txresp -status 503 -body "Backend error"
+} -start
+
+varnish v1 -cliok "param.set feature +expire_on_reval_success"
+varnish v1 -vcl {
+	backend s6 { .host = "${s6_addr}"; .port = "${s6_port}"; }
+	backend s7 { .host = "${s7_addr}"; .port = "${s7_port}"; }
+
+	sub vcl_recv {
+		if (req.http.Use-Backend == "s7") {
+			set req.backend_hint = s7;
+		} else {
+			set req.backend_hint = s6;
+		}
+	}
+
+	sub vcl_backend_response {
+		# On success, set rearm from stale-if-error
+		if (beresp.status < 500 && beresp.stale_if_error > 0s) {
+			set beresp.rearm = beresp.stale_if_error;
+		}
+		# On error with stale available, serve stale
+		if (beresp.status >= 500 && beresp.stale_exists) {
+			set beresp.http.X-Stale-SIE = obj_stale.stale_if_error;
+			if (obj_stale.stale_if_error > 0s) {
+				return (stale);
+			}
+		}
+		set beresp.http.X-Stale-Exists = beresp.stale_exists;
+	}
+}
+
+# First request - cache the object
+client c6 {
+	txreq -url "/stale-if-error-test"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "Original response"
+	expect resp.http.X-Stale-Exists == "false"
+} -run
+
+# Wait for TTL to expire
+delay 1.5
+
+# Second request - backend returns 503, should serve stale
+client c7 {
+	txreq -url "/stale-if-error-test" -hdr "Use-Backend: s7"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "Original response"
+} -run
+
+# Test 7: beresp.stale_exists in vcl_backend_error
+server s8 {
+	rxreq
+	txresp -hdr "Cache-Control: max-age=1, stale-if-error=60" \
+	    -body "Cached for error test"
+} -start
+
+server s9 -listen 0 {
+} -start
+server s9 -break
+
+varnish v1 -cliok "param.set feature +expire_on_reval_success"
+varnish v1 -vcl {
+	backend s8 { .host = "${s8_addr}"; .port = "${s8_port}"; }
+	backend s9 {
+		.host = "${s9_addr}";
+		.port = "${s9_port}";
+		.connect_timeout = 0.1s;
+	}
+
+	sub vcl_recv {
+		if (req.http.Use-Backend == "s9") {
+			set req.backend_hint = s9;
+		} else {
+			set req.backend_hint = s8;
+		}
+	}
+
+	sub vcl_backend_response {
+		if (beresp.status < 500 && beresp.stale_if_error > 0s) {
+			set beresp.rearm = beresp.stale_if_error;
+		}
+	}
+
+	sub vcl_backend_error {
+		# Connection failure - check for stale object
+		if (beresp.stale_exists && obj_stale.stale_if_error > 0s) {
+			return (stale);
+		}
+	}
+}
+
+# Cache the object
+client c8 {
+	txreq -url "/backend-error-test"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "Cached for error test"
+} -run
+
+# Wait for TTL to expire
+delay 1.5
+
+# Request with failing backend - should serve stale
+client c9 {
+	txreq -url "/backend-error-test" -hdr "Use-Backend: s9"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "Cached for error test"
+} -run

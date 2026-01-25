@@ -117,6 +117,7 @@ vbf_allocobj(struct busyobj *bo, unsigned l)
 	oc->grace = 0.0;
 	oc->keep = 0.0;
 	oc->rearm = 0.0;
+	oc->stale_if_error = 0.0;
 	return (STV_NewObject(bo->wrk, oc, stv_transient, l));
 }
 
@@ -486,7 +487,8 @@ vbf_stp_startfetch(struct worker *wrk, struct busyobj *bo)
 	    &oc->t_origin,
 	    &oc->ttl,
 	    &oc->grace,
-	    &oc->keep);
+	    &oc->keep,
+	    &oc->stale_if_error);
 
 	/* Set default rearm period from parameter */
 	oc->rearm = cache_param->default_rearm;
@@ -1064,6 +1066,7 @@ vbf_stp_stalefetch(struct worker *wrk, struct busyobj *bo)
 	oc->grace = grace;
 	oc->keep = stale_oc->keep;
 	oc->rearm = stale_oc->rearm;
+	oc->stale_if_error = stale_oc->stale_if_error;
 
 	if (vbf_beresp2obj(bo)) {
 		wrk->stats->fetch_failed++;
@@ -1164,6 +1167,7 @@ vbf_stp_error(struct worker *wrk, struct busyobj *bo)
 	oc->grace = 0;
 	oc->keep = 0;
 	oc->rearm = 0;
+	oc->stale_if_error = 0;
 
 	synth_body = VSB_new_auto();
 	AN(synth_body);

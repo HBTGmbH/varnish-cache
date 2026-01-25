@@ -1329,6 +1329,27 @@ beresp.rearm
 	Requires feature +expire_on_reval_success to be enabled.
 
 
+.. _beresp.stale_if_error:
+
+beresp.stale_if_error
+
+	Type: DURATION
+
+	Readable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
+
+	Writable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
+
+	Default: Cache-Control ``stale-if-error`` directive, or 0.
+
+	The stale-if-error value from RFC 5861. When set, indicates how long
+	past TTL expiration stale content may be served if the backend returns
+	an error (5xx status) or is unreachable.
+
+	This value is parsed from the Cache-Control header's ``stale-if-error``
+	directive and can be used in VCL to implement stale-if-error behavior
+	using ``return(stale)`` when the backend returns an error.
+
+
 beresp.proto	``VCL <= 4.0``
 
 	Type: STRING
@@ -1510,6 +1531,28 @@ beresp.uncacheable
 	"Ignoring attempt to reset beresp.uncacheable".
 
 
+.. _beresp.stale_exists:
+
+beresp.stale_exists
+
+	Type: BOOL
+
+	Readable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
+
+	Returns ``true`` if a stale object exists for this request.
+
+	Use this to check whether ``return(stale)`` can be used and whether
+	``obj_stale.*`` variables are accessible.
+
+	Example::
+
+	    sub vcl_backend_error {
+	        if (beresp.stale_exists && obj_stale.stale_if_error > 0s) {
+	            return (stale);
+	        }
+	    }
+
+
 .. _beresp.was_304:
 
 beresp.was_304
@@ -1610,6 +1653,22 @@ obj_stale.rearm
 	Readable from: vcl_backend_refresh
 
 	The stale object's rearm period in seconds.
+
+
+.. _obj_stale.stale_if_error:
+
+obj_stale.stale_if_error
+
+	Type: DURATION
+
+	Readable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
+
+	The stale object's stale-if-error value in seconds.
+
+	This is the value from the original cached response, not the current
+	backend response. Use this in ``vcl_backend_response`` (for 5xx errors)
+	or ``vcl_backend_error`` (for connection failures) to decide whether
+	to ``return(stale)``.
 
 
 .. _obj_stale.proto:
@@ -1796,6 +1855,21 @@ obj.rearm
 
 	This is how long past ttl+grace+keep the object is kept
 	for potential rearming when backend revalidation fails.
+
+
+.. _obj.stale_if_error:
+
+obj.stale_if_error
+
+	Type: DURATION
+
+	Readable from: vcl_hit, vcl_deliver
+
+	The object's stale-if-error value in seconds, as parsed from the
+	Cache-Control ``stale-if-error`` directive (RFC 5861).
+
+	This indicates how long past TTL expiration stale content may be
+	served if the backend returns an error.
 
 
 .. _obj.proto:

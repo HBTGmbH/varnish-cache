@@ -358,6 +358,7 @@ struct objcore {
 	float			grace;
 	float			keep;
 	float			rearm;
+	float			stale_if_error;
 
 	uint8_t			flags;
 
@@ -1058,7 +1059,7 @@ char *WS_VSB_finish(struct vsb *, struct ws *, size_t *);
 
 /* cache_rfc2616.c */
 void RFC2616_Ttl(struct busyobj *, vtim_real now, vtim_real *t_origin,
-    float *ttl, float *grace, float *keep);
+    float *ttl, float *grace, float *keep, float *stale_if_error);
 unsigned RFC2616_Req_Gzip(const struct http *);
 int RFC2616_Do_Cond(const struct req *sp);
 void RFC2616_Weaken_Etag(struct http *hp);
