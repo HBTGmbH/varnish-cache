@@ -153,7 +153,7 @@ server s7 {
 	txresp -status 503 -body "Backend error"
 } -start
 
-varnish v1 -cliok "param.set feature +expire_on_reval_success"
+varnish v1 -cliok "param.set feature +revive_stale"
 varnish v1 -vcl {
 	backend s6 { .host = "${s6_addr}"; .port = "${s6_port}"; }
 	backend s7 { .host = "${s7_addr}"; .port = "${s7_port}"; }
@@ -213,7 +213,7 @@ server s9 -listen 0 {
 } -start
 server s9 -break
 
-varnish v1 -cliok "param.set feature +expire_on_reval_success"
+varnish v1 -cliok "param.set feature +revive_stale"
 varnish v1 -vcl {
 	backend s8 { .host = "${s8_addr}"; .port = "${s8_port}"; }
 	backend s9 {
