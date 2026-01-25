@@ -269,6 +269,14 @@ VRT_r_beresp_uncacheable(VRT_CTX)
 	return (ctx->bo->uncacheable);
 }
 
+VCL_BOOL
+VRT_r_beresp_stale_exists(VRT_CTX)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(ctx->bo, BUSYOBJ_MAGIC);
+	return (ctx->bo->stale_oc != NULL);
+}
+
 VCL_VOID
 VRT_l_req_trace(VRT_CTX, VCL_BOOL a)
 {
@@ -883,6 +891,24 @@ VRT_DO_EXP_R(obj_stale, ctx->bo->stale_oc, keep, 0)
 VRT_DO_EXP_R(obj, ctx->req->objcore, keep, 0)
 VRT_DO_EXP_R(obj_stale, ctx->bo->stale_oc, rearm, 0)
 VRT_DO_EXP_R(obj, ctx->req->objcore, rearm, 0)
+
+/*
+ * obj_stale.stale_if_error needs NULL protection because it's accessible
+ * in vcl_backend_response and vcl_backend_error where stale_oc may be NULL
+ * (e.g., on first fetch that fails, not a revalidation).
+ */
+VCL_DURATION
+VRT_r_obj_stale_stale_if_error(VRT_CTX)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(ctx->bo, BUSYOBJ_MAGIC);
+	if (ctx->bo->stale_oc == NULL)
+		return (0.0);
+	CHECK_OBJ(ctx->bo->stale_oc, OBJCORE_MAGIC);
+	return (ctx->bo->stale_oc->stale_if_error);
+}
+
+VRT_DO_EXP_R(obj, ctx->req->objcore, stale_if_error, 0)
 VRT_DO_EXP_L(beresp, ctx->bo->fetch_objcore, ttl,
     ttl_now(ctx) - ctx->bo->fetch_objcore->t_origin)
 VRT_DO_EXP_R(beresp, ctx->bo->fetch_objcore, ttl,
@@ -894,6 +920,8 @@ VRT_DO_EXP_L(beresp, ctx->bo->fetch_objcore, keep, 0)
 VRT_DO_EXP_R(beresp, ctx->bo->fetch_objcore, keep, 0)
 VRT_DO_EXP_L(beresp, ctx->bo->fetch_objcore, rearm, 0)
 VRT_DO_EXP_R(beresp, ctx->bo->fetch_objcore, rearm, 0)
+VRT_DO_EXP_L(beresp, ctx->bo->fetch_objcore, stale_if_error, 0)
+VRT_DO_EXP_R(beresp, ctx->bo->fetch_objcore, stale_if_error, 0)
 
 /*lint -restore */
 
