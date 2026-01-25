@@ -150,9 +150,7 @@ struct smp_object {
 	float			ttl;
 	float			grace;
 	float			keep;
-	float			rearm;
 	float			stale_if_error;
-	uint32_t		__filler__;	/* -> align/8 on 32bit */
 	double			ban;
 	uint64_t		ptr;		/* rel to silo */
 };

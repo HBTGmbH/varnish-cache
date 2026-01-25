@@ -1296,7 +1296,8 @@ beresp.keep
 
 	Default: ``default_keep`` parameter.
 
-	Set to a period to enable conditional backend requests.
+	Set to a period to enable conditional backend requests and
+	stale object rearming on failed backend revalidation.
 
 	The keep time is cache lifetime in addition to the ttl.
 
@@ -1304,29 +1305,9 @@ beresp.keep
 	to issue conditional (If-Modified-Since / If-None-Match)
 	requests to the backend to refresh them.
 
-
-.. _beresp.rearm:
-
-beresp.rearm
-
-	Type: DURATION
-
-	Readable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
-
-	Writable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
-
-	Default: ``default_rearm`` parameter.
-
-	Set to a period to enable stale object rearming on failed
-	backend revalidation.
-
-	The rearm time is cache lifetime in addition to ttl+grace+keep.
-
-	Objects that are past ttl+grace+keep but within the rearm time
-	are available for rearming when backend revalidation fails and
-	VCL returns ``stale`` from vcl_backend_response or vcl_backend_error.
-
-	Requires feature +expire_on_reval_success to be enabled.
+	Objects within the keep period are also available for rearming
+	when backend revalidation fails and VCL returns ``stale`` from
+	vcl_backend_response or vcl_backend_error.
 
 
 .. _beresp.stale_if_error:
@@ -1644,17 +1625,6 @@ obj_stale.keep
 	The stale object's keep period in seconds.
 
 
-.. _obj_stale.rearm:
-
-obj_stale.rearm
-
-	Type: DURATION
-
-	Readable from: vcl_backend_refresh
-
-	The stale object's rearm period in seconds.
-
-
 .. _obj_stale.stale_if_error:
 
 obj_stale.stale_if_error
@@ -1841,20 +1811,6 @@ obj.keep
 	Readable from: vcl_hit, vcl_deliver
 
 	The object's keep period in seconds.
-
-
-.. _obj.rearm:
-
-obj.rearm
-
-	Type: DURATION
-
-	Readable from: vcl_hit, vcl_deliver
-
-	The object's rearm period in seconds.
-
-	This is how long past ttl+grace+keep the object is kept
-	for potential rearming when backend revalidation fails.
 
 
 .. _obj.stale_if_error:

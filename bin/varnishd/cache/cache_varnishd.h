@@ -231,7 +231,6 @@ void EXP_Remove(struct objcore *, const struct objcore *);
 		(xx)->ttl = 0.0;					\
 		(xx)->grace = 0.0;					\
 		(xx)->keep = 0.0;					\
-		(xx)->rearm = 0.0;					\
 		(xx)->stale_if_error = 0.0;				\
 	} while (0)
 
@@ -241,12 +240,11 @@ void EXP_Remove(struct objcore *, const struct objcore *);
 		(to)->ttl = (fm)->ttl;					\
 		(to)->grace = (fm)->grace;				\
 		(to)->keep = (fm)->keep;				\
-		(to)->rearm = (fm)->rearm;				\
 		(to)->stale_if_error = (fm)->stale_if_error;		\
 	} while (0)
 
 #define EXP_WHEN(to)							\
-	((to)->t_origin + (to)->ttl + (to)->grace + (to)->keep + (to)->rearm)
+	((to)->t_origin + (to)->ttl + (to)->grace + (to)->keep)
 
 /* cache_exp.c */
 void EXP_Rearm(struct objcore *oc, vtim_real now,
