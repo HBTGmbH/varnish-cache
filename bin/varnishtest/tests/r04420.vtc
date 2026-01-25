@@ -167,9 +167,9 @@ varnish v1 -vcl {
 	}
 
 	sub vcl_backend_response {
-		# On success, set rearm from stale-if-error
+		# On success, set keep from stale-if-error for rearming
 		if (beresp.status < 500 && beresp.stale_if_error > 0s) {
-			set beresp.rearm = beresp.stale_if_error;
+			set beresp.keep = beresp.stale_if_error;
 		}
 		# On error with stale available, serve stale
 		if (beresp.status >= 500 && beresp.stale_exists) {
@@ -232,7 +232,7 @@ varnish v1 -vcl {
 
 	sub vcl_backend_response {
 		if (beresp.status < 500 && beresp.stale_if_error > 0s) {
-			set beresp.rearm = beresp.stale_if_error;
+			set beresp.keep = beresp.stale_if_error;
 		}
 	}
 

@@ -459,28 +459,10 @@ PARAM_SIMPLE(
 	/* units */	"seconds",
 	/* descr */
 	"Default keep period.  We will keep a useless object around this "
-	"long, making it available for conditional backend fetches.  That "
-	"means that the object will be removed from the cache at the end "
-	"of ttl+grace+keep.",
-	/* flags */	OBJ_STICKY,
-	/* dyn_min_reason */	NULL,
-	/* dyn_max_reason */	NULL,
-	/* dyn_def_reason */	"0s"
-)
-
-PARAM_SIMPLE(
-	/* name */	default_rearm,
-	/* type */	duration,
-	/* min */	"0.000",
-	/* max */	NULL,
-	/* def */	"0s",
-	/* units */	"seconds",
-	/* descr */
-	"Default rearm period.  We will keep a stale object around this "
-	"long past ttl+grace+keep, making it available for rearming when "
-	"backend revalidation fails and VCL returns 'stale' from "
-	"vcl_backend_response or vcl_backend_error. Requires feature "
-	"+expire_on_reval_success to be enabled.",
+	"long, making it available for conditional backend fetches and "
+	"for rearming when backend revalidation fails.  That means that "
+	"the object will be removed from the cache at the end of "
+	"ttl+grace+keep.",
 	/* flags */	OBJ_STICKY,
 	/* dyn_min_reason */	NULL,
 	/* dyn_max_reason */	NULL,

@@ -357,7 +357,6 @@ struct objcore {
 	float			ttl;
 	float			grace;
 	float			keep;
-	float			rearm;
 	float			stale_if_error;
 
 	uint8_t			flags;
