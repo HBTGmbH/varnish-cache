@@ -86,7 +86,7 @@ rfc2616_time(const char *p)
 
 void
 RFC2616_Ttl(struct busyobj *bo, vtim_real now, vtim_real *t_origin,
-    float *ttl, float *grace, float *keep)
+    float *ttl, float *grace, float *keep, float *stale_if_error)
 {
 	unsigned max_age, age;
 	vtim_real h_date, h_expires;
@@ -100,11 +100,13 @@ RFC2616_Ttl(struct busyobj *bo, vtim_real now, vtim_real *t_origin,
 	AN(ttl);
 	AN(grace);
 	AN(keep);
+	AN(stale_if_error);
 
 	*t_origin = now;
 	*ttl = cache_param->default_ttl;
 	*grace = cache_param->default_grace;
 	*keep = cache_param->default_keep;
+	*stale_if_error = 0.0;
 
 	hp = bo->beresp;
 
@@ -132,6 +134,7 @@ RFC2616_Ttl(struct busyobj *bo, vtim_real now, vtim_real *t_origin,
 		*ttl = -1;
 		*grace = 0;
 		*keep = 0;
+		*stale_if_error = 0;
 		return;
 	}
 
@@ -220,9 +223,17 @@ RFC2616_Ttl(struct busyobj *bo, vtim_real now, vtim_real *t_origin,
 		*grace = rfc2616_time(p);
 	}
 
+	/*
+	 * RFC5861 stale-if-error: allows serving stale on backend errors.
+	 */
+	if (*ttl >= 0 && http_GetHdrField(hp, H_Cache_Control,
+	    "stale-if-error", &p) && p != NULL) {
+		*stale_if_error = rfc2616_time(p);
+	}
+
 	VSLb(bo->vsl, SLT_TTL,
-	    "RFC %.0f %.0f %.0f %.0f %.0f %.0f %.0f %u %s",
-	    *ttl, *grace, *keep, now,
+	    "RFC %.0f %.0f %.0f %.0f %.0f %.0f %.0f %.0f %u %s",
+	    *ttl, *grace, *keep, *stale_if_error, now,
 	    *t_origin, h_date, h_expires, max_age,
 	    bo->uncacheable ? "uncacheable" : "cacheable");
 }
