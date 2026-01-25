@@ -422,7 +422,7 @@ The `vcl_backend_response` subroutine may terminate with calling
   |  The stale object's TTL is set to ``beresp.stale_ttl`` (or
   |  ``stale_rearm_ttl`` parameter if not set) and grace to
   |  ``beresp.stale_grace`` (or original grace if not set).
-  |  Requires feature +expire_on_reval_success and a stale object
+  |  Requires feature +revive_stale and a stale object
   |  to exist (i.e., this must be a revalidation request).
 
 .. _vcl_backend_error:
@@ -470,7 +470,7 @@ with one of the following keywords:
   |  The stale object's TTL is set to ``beresp.stale_ttl`` (or
   |  ``stale_rearm_ttl`` parameter if not set) and grace to
   |  ``beresp.stale_grace`` (or original grace if not set).
-  |  Requires feature +expire_on_reval_success and a stale object
+  |  Requires feature +revive_stale and a stale object
   |  to exist (i.e., this must be a revalidation request).
 
 During vcl.load / vcl.discard

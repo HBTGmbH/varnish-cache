@@ -103,7 +103,7 @@ FEATURE_BIT(STALE_INDEFINITELY,		stale_indefinitely,
     "Objects can still be removed via LRU eviction, bans, or explicit purges."
 )
 
-FEATURE_BIT(EXPIRE_ON_REVAL_SUCCESS,	expire_on_reval_success,
+FEATURE_BIT(REVIVE_STALE,	revive_stale,
     "Enable stale object rearming on failed backend revalidation. "
     "When VCL returns 'stale' from vcl_backend_response or vcl_backend_error, "
     "the stale object is kept and its TTL is rearmed instead of serving an error."

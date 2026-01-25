@@ -1411,7 +1411,7 @@ beresp.stale_ttl
 
 	The TTL to set on the stale object when rearming via ``return(stale)``.
 	Only used when ``return(stale)`` is called. Requires feature
-	+expire_on_reval_success to be enabled.
+	+revive_stale to be enabled.
 
 .. _beresp.stale_grace:
 
@@ -1427,7 +1427,7 @@ beresp.stale_grace
 
 	The grace period to set on the stale object when rearming via
 	``return(stale)``. Only used when ``return(stale)`` is called.
-	Requires feature +expire_on_reval_success to be enabled.
+	Requires feature +revive_stale to be enabled.
 
 beresp.storage_hint	``VCL <= 4.0``
 
