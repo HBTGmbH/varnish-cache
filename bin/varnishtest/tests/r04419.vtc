@@ -1,6 +1,6 @@
 varnishtest "Test return(stale) for backend errors"
 
-# Test that with feature +expire_on_reval_success:
+# Test that with feature +revive_stale:
 # 1. return(stale) in vcl_backend_response rearms the stale object
 # 2. return(stale) in vcl_backend_error rearms the stale object
 # 3. Stale objects are served instead of error responses
@@ -18,7 +18,7 @@ server s2 {
 	txresp -status 503 -body "Error response"
 } -start
 
-varnish v1 -arg "-p feature=+expire_on_reval_success" \
+varnish v1 -arg "-p feature=+revive_stale" \
            -arg "-p stale_rearm_ttl=10" -vcl {
 	backend s1 { .host = "${s1_addr}"; .port = "${s1_port}"; }
 	backend s2 { .host = "${s2_addr}"; .port = "${s2_port}"; }

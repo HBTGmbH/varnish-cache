@@ -576,10 +576,10 @@ vbf_stp_startfetch(struct worker *wrk, struct busyobj *bo)
 			vbf_cleanup(bo);
 			return (F_STP_ERROR);
 		}
-		if (!FEATURE(FEATURE_EXPIRE_ON_REVAL_SUCCESS)) {
+		if (!FEATURE(FEATURE_REVIVE_STALE)) {
 			VSLb(bo->vsl, SLT_VCL_Error,
 			    "return(stale) requires "
-			    "feature +expire_on_reval_success");
+			    "feature +revive_stale");
 			if (bo->htc)
 				bo->htc->doclose = SC_RESP_CLOSE;
 			vbf_cleanup(bo);
@@ -1177,10 +1177,10 @@ vbf_stp_error(struct worker *wrk, struct busyobj *bo)
 			VSB_destroy(&synth_body);
 			return (F_STP_FAIL);
 		}
-		if (!FEATURE(FEATURE_EXPIRE_ON_REVAL_SUCCESS)) {
+		if (!FEATURE(FEATURE_REVIVE_STALE)) {
 			VSLb(bo->vsl, SLT_VCL_Error,
 			    "return(stale) requires "
-			    "feature +expire_on_reval_success");
+			    "feature +revive_stale");
 			VSB_destroy(&synth_body);
 			return (F_STP_FAIL);
 		}
