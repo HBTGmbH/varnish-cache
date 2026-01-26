@@ -570,7 +570,88 @@ VRT_r_##obj##_reason(VRT_CTX)					\
 }
 
 VRT_OC_VAR_R(obj, req, REQ_MAGIC, objcore)
-VRT_OC_VAR_R(obj_stale, bo, BUSYOBJ_MAGIC, stale_oc)
+
+/*
+ * obj_stale.* variables need NULL protection because they're accessible
+ * in vcl_backend_response and vcl_backend_error where stale_oc may be NULL
+ * (e.g., on first fetch, not a revalidation).
+ */
+VCL_STEVEDORE
+VRT_r_obj_stale_storage(VRT_CTX)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(ctx->bo, BUSYOBJ_MAGIC);
+	if (ctx->bo->stale_oc == NULL)
+		return (NULL);
+	CHECK_OBJ(ctx->bo->stale_oc, OBJCORE_MAGIC);
+	AN(ctx->bo->stale_oc->stobj);
+	CHECK_OBJ_NOTNULL(ctx->bo->stale_oc->stobj->stevedore,
+	    STEVEDORE_MAGIC);
+	return (ctx->bo->stale_oc->stobj->stevedore);
+}
+
+VCL_BOOL
+VRT_r_obj_stale_can_esi(VRT_CTX)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(ctx->bo, BUSYOBJ_MAGIC);
+	if (ctx->bo->stale_oc == NULL)
+		return (0);
+	CHECK_OBJ(ctx->bo->stale_oc, OBJCORE_MAGIC);
+	return (ObjHasAttr(ctx->bo->wrk, ctx->bo->stale_oc,
+	    OA_ESIDATA));
+}
+
+VCL_BOOL
+VRT_r_obj_stale_uncacheable(VRT_CTX)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(ctx->bo, BUSYOBJ_MAGIC);
+	if (ctx->bo->stale_oc == NULL)
+		return (0);
+	CHECK_OBJ(ctx->bo->stale_oc, OBJCORE_MAGIC);
+
+	return (ctx->bo->stale_oc->flags & OC_F_HFM ? 1 : 0);
+}
+
+VCL_INT
+VRT_r_obj_stale_status(VRT_CTX)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(ctx->bo, BUSYOBJ_MAGIC);
+	if (ctx->bo->stale_oc == NULL)
+		return (0);
+	CHECK_OBJ(ctx->bo->stale_oc, OBJCORE_MAGIC);
+
+	return (HTTP_GetStatusPack(ctx->bo->wrk,
+	    ctx->bo->stale_oc));
+}
+
+VCL_STRING
+VRT_r_obj_stale_proto(VRT_CTX)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(ctx->bo, BUSYOBJ_MAGIC);
+	if (ctx->bo->stale_oc == NULL)
+		return (NULL);
+	CHECK_OBJ(ctx->bo->stale_oc, OBJCORE_MAGIC);
+
+	return (HTTP_GetHdrPack(ctx->bo->wrk,
+	    ctx->bo->stale_oc, H__Proto));
+}
+
+VCL_STRING
+VRT_r_obj_stale_reason(VRT_CTX)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(ctx->bo, BUSYOBJ_MAGIC);
+	if (ctx->bo->stale_oc == NULL)
+		return (NULL);
+	CHECK_OBJ(ctx->bo->stale_oc, OBJCORE_MAGIC);
+
+	return (HTTP_GetHdrPack(ctx->bo->wrk,
+	    ctx->bo->stale_oc, H__Reason));
+}
 
 /*--------------------------------------------------------------------*/
 
@@ -837,20 +918,67 @@ VRT_r_##which##_##fld(VRT_CTX)					\
 
 /*lint -save -e835 */	// Zero right hand arg to '-'
 
-VRT_DO_EXP_R(obj_stale, ctx->bo->stale_oc, ttl,
-    ttl_now(ctx) - ctx->bo->stale_oc->t_origin)
-VRT_DO_EXP_R(obj, ctx->req->objcore, ttl,
-    ttl_now(ctx) - ctx->req->objcore->t_origin)
-VRT_DO_EXP_R(obj_stale, ctx->bo->stale_oc, grace, 0)
-VRT_DO_EXP_R(obj, ctx->req->objcore, grace, 0)
-VRT_DO_EXP_R(obj_stale, ctx->bo->stale_oc, keep, 0)
-VRT_DO_EXP_R(obj, ctx->req->objcore, keep, 0)
-
 /*
- * obj_stale.stale_if_error needs NULL protection because it's accessible
+ * obj_stale.* exp variables need NULL protection because they're accessible
  * in vcl_backend_response and vcl_backend_error where stale_oc may be NULL
  * (e.g., on first fetch that fails, not a revalidation).
  */
+VCL_DURATION
+VRT_r_obj_stale_ttl(VRT_CTX)
+{
+	double d;
+
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(ctx->bo, BUSYOBJ_MAGIC);
+	if (ctx->bo->stale_oc == NULL)
+		return (0.0);
+	CHECK_OBJ(ctx->bo->stale_oc, OBJCORE_MAGIC);
+	d = ctx->bo->stale_oc->ttl;
+	if (d <= 0.0)
+		d = 0.0;
+	d -= (ttl_now(ctx) - ctx->bo->stale_oc->t_origin);
+	return (d);
+}
+
+VRT_DO_EXP_R(obj, ctx->req->objcore, ttl,
+    ttl_now(ctx) - ctx->req->objcore->t_origin)
+
+VCL_DURATION
+VRT_r_obj_stale_grace(VRT_CTX)
+{
+	double d;
+
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(ctx->bo, BUSYOBJ_MAGIC);
+	if (ctx->bo->stale_oc == NULL)
+		return (0.0);
+	CHECK_OBJ(ctx->bo->stale_oc, OBJCORE_MAGIC);
+	d = ctx->bo->stale_oc->grace;
+	if (d <= 0.0)
+		d = 0.0;
+	return (d);
+}
+
+VRT_DO_EXP_R(obj, ctx->req->objcore, grace, 0)
+
+VCL_DURATION
+VRT_r_obj_stale_keep(VRT_CTX)
+{
+	double d;
+
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(ctx->bo, BUSYOBJ_MAGIC);
+	if (ctx->bo->stale_oc == NULL)
+		return (0.0);
+	CHECK_OBJ(ctx->bo->stale_oc, OBJCORE_MAGIC);
+	d = ctx->bo->stale_oc->keep;
+	if (d <= 0.0)
+		d = 0.0;
+	return (d);
+}
+
+VRT_DO_EXP_R(obj, ctx->req->objcore, keep, 0)
+
 VCL_DURATION
 VRT_r_obj_stale_stale_if_error(VRT_CTX)
 {
@@ -895,7 +1023,18 @@ VRT_DO_TIME_R(resp, req, t_resp)
 VRT_DO_TIME_R(bereq, bo, t_first)
 VRT_DO_TIME_R(beresp, bo, t_resp)
 VRT_DO_TIME_R(obj, req->objcore, t_origin)
-VRT_DO_TIME_R(obj_stale, bo->stale_oc, t_origin)
+
+VCL_TIME
+VRT_r_obj_stale_time(VRT_CTX)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(ctx->bo, BUSYOBJ_MAGIC);
+	if (ctx->bo->stale_oc == NULL)
+		return (0.0);
+	CHECK_OBJ(ctx->bo->stale_oc, OBJCORE_MAGIC);
+
+	return (ctx->bo->stale_oc->t_origin);
+}
 
 /*--------------------------------------------------------------------
  */
@@ -910,7 +1049,17 @@ VRT_r_##which##_##age(VRT_CTX)					\
 	return (ttl_now(ctx) - oc->t_origin);			\
 }
 
-VRT_DO_AGE_R(obj_stale, ctx->bo->stale_oc)
+VCL_DURATION
+VRT_r_obj_stale_age(VRT_CTX)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(ctx->bo, BUSYOBJ_MAGIC);
+	if (ctx->bo->stale_oc == NULL)
+		return (0.0);
+	CHECK_OBJ(ctx->bo->stale_oc, OBJCORE_MAGIC);
+	return (ttl_now(ctx) - ctx->bo->stale_oc->t_origin);
+}
+
 VRT_DO_AGE_R(obj, ctx->req->objcore)
 VRT_DO_AGE_R(beresp, ctx->bo->fetch_objcore)
 
@@ -1079,7 +1228,9 @@ VRT_r_obj_stale_hits(VRT_CTX)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	CHECK_OBJ_NOTNULL(ctx->bo, BUSYOBJ_MAGIC);
-	CHECK_OBJ_NOTNULL(ctx->bo->stale_oc, OBJCORE_MAGIC);
+	if (ctx->bo->stale_oc == NULL)
+		return (0);
+	CHECK_OBJ(ctx->bo->stale_oc, OBJCORE_MAGIC);
 
 	return (ctx->bo->stale_oc->hits);
 }
@@ -1089,7 +1240,9 @@ VRT_r_obj_stale_is_valid(VRT_CTX)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	CHECK_OBJ_NOTNULL(ctx->bo, BUSYOBJ_MAGIC);
-	CHECK_OBJ_NOTNULL(ctx->bo->stale_oc, OBJCORE_MAGIC);
+	if (ctx->bo->stale_oc == NULL)
+		return (0);
+	CHECK_OBJ(ctx->bo->stale_oc, OBJCORE_MAGIC);
 
 	return (!(ctx->bo->stale_oc->flags & OC_F_DYING));
 }
