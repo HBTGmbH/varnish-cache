@@ -419,9 +419,14 @@ The `vcl_backend_response` subroutine may terminate with calling
   |
   | ``stale``
   |  Rearm and serve the stale object instead of this response.
-  |  The stale object's TTL is set to ``beresp.stale_ttl`` (or
-  |  ``stale_rearm_ttl`` parameter if not set) and grace to
-  |  ``beresp.stale_grace`` (or original grace if not set).
+  |  The stale object's TTL and grace are set from ``beresp.ttl``
+  |  and ``beresp.grace``. To preserve the original stale object's
+  |  values, set them before calling return(stale)::
+  |
+  |      set beresp.ttl = obj_stale.ttl;
+  |      set beresp.grace = obj_stale.grace;
+  |      return(stale);
+  |
   |  Requires feature +revive_stale and a stale object
   |  to exist (i.e., this must be a revalidation request).
 
@@ -467,9 +472,14 @@ with one of the following keywords:
   |
   | ``stale``
   |  Rearm and serve the stale object instead of a synthetic error.
-  |  The stale object's TTL is set to ``beresp.stale_ttl`` (or
-  |  ``stale_rearm_ttl`` parameter if not set) and grace to
-  |  ``beresp.stale_grace`` (or original grace if not set).
+  |  The stale object's TTL and grace are set from ``beresp.ttl``
+  |  and ``beresp.grace``. To preserve the original stale object's
+  |  values, set them before calling return(stale)::
+  |
+  |      set beresp.ttl = obj_stale.ttl;
+  |      set beresp.grace = obj_stale.grace;
+  |      return(stale);
+  |
   |  Requires feature +revive_stale and a stale object
   |  to exist (i.e., this must be a revalidation request).
 

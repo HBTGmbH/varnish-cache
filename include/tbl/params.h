@@ -486,20 +486,6 @@ PARAM_SIMPLE(
 )
 
 PARAM_SIMPLE(
-	/* name */	stale_rearm_ttl,
-	/* type */	timeout,
-	/* min */	"0.000",
-	/* max */	NULL,
-	/* def */	"30.000",
-	/* units */	"seconds",
-	/* descr */
-	"Default TTL to set on stale objects when rearming after failed "
-	"backend revalidation. This is used when VCL returns 'stale' from "
-	"vcl_backend_response or vcl_backend_error. Can be overridden in "
-	"VCL via beresp.stale_ttl."
-)
-
-PARAM_SIMPLE(
 	/* name */	uncacheable_ttl,
 	/* type */	duration,
 	/* min */	"0.000",
