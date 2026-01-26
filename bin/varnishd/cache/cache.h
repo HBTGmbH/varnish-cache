@@ -358,6 +358,7 @@ struct objcore {
 	float			grace;
 	float			keep;
 	float			stale_if_error;
+	vtim_real		t_stale_if_error;
 
 	uint8_t			flags;
 

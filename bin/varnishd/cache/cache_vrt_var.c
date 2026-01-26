@@ -885,6 +885,16 @@ ttl_now(VRT_CTX)
 	}
 }
 
+static inline void
+update_t_stale_if_error(struct objcore *oc)
+{
+	if (oc->stale_if_error > 0)
+		oc->t_stale_if_error = oc->t_origin + oc->ttl +
+		    oc->stale_if_error;
+	else
+		oc->t_stale_if_error = 0;
+}
+
 #define VRT_DO_EXP_L(which, oc, fld, offset)			\
 								\
 VCL_VOID							\
@@ -1022,9 +1032,59 @@ VRT_r_obj_stale_stale_if_error(VRT_CTX)
 	return (ctx->bo->stale_oc->stale_if_error);
 }
 
+VCL_DURATION
+VRT_r_obj_stale_stale_if_error_remaining(VRT_CTX)
+{
+	double d;
+
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(ctx->bo, BUSYOBJ_MAGIC);
+	if (ctx->bo->stale_oc == NULL)
+		return (0.0);
+	CHECK_OBJ(ctx->bo->stale_oc, OBJCORE_MAGIC);
+	if (ctx->bo->stale_oc->t_stale_if_error <= 0)
+		return (0.0);
+	d = ctx->bo->stale_oc->t_stale_if_error - ttl_now(ctx);
+	if (d < 0.0)
+		d = 0.0;
+	return (d);
+}
+
 VRT_DO_EXP_R(obj, ctx->req->objcore, stale_if_error, 0)
-VRT_DO_EXP_L(beresp, ctx->bo->fetch_objcore, ttl,
-    ttl_now(ctx) - ctx->bo->fetch_objcore->t_origin)
+
+VCL_DURATION
+VRT_r_obj_stale_if_error_remaining(VRT_CTX)
+{
+	double d;
+
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(ctx->req, REQ_MAGIC);
+	CHECK_OBJ_NOTNULL(ctx->req->objcore, OBJCORE_MAGIC);
+	if (ctx->req->objcore->t_stale_if_error <= 0)
+		return (0.0);
+	d = ctx->req->objcore->t_stale_if_error - ttl_now(ctx);
+	if (d < 0.0)
+		d = 0.0;
+	return (d);
+}
+
+VCL_VOID
+VRT_l_beresp_ttl(VRT_CTX, VCL_DURATION a)
+{
+	struct objcore *oc;
+
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	oc = ctx->bo->fetch_objcore;
+	a += ttl_now(ctx) - oc->t_origin;
+	if (a < 0.0)
+		a = 0.0;
+	oc->ttl = a;
+	update_t_stale_if_error(oc);
+	VSLb(ctx->vsl, SLT_TTL, "VCL %.0f %.0f %.0f %.0f %s",
+	    oc->ttl, oc->grace, oc->keep, oc->t_origin,
+	    ctx->bo->uncacheable ? "uncacheable" : "cacheable");
+}
+
 VRT_DO_EXP_R(beresp, ctx->bo->fetch_objcore, ttl,
     ttl_now(ctx) - ctx->bo->fetch_objcore->t_origin)
 
@@ -1032,8 +1092,40 @@ VRT_DO_EXP_L(beresp, ctx->bo->fetch_objcore, grace, 0)
 VRT_DO_EXP_R(beresp, ctx->bo->fetch_objcore, grace, 0)
 VRT_DO_EXP_L(beresp, ctx->bo->fetch_objcore, keep, 0)
 VRT_DO_EXP_R(beresp, ctx->bo->fetch_objcore, keep, 0)
-VRT_DO_EXP_L(beresp, ctx->bo->fetch_objcore, stale_if_error, 0)
+
+VCL_VOID
+VRT_l_beresp_stale_if_error(VRT_CTX, VCL_DURATION a)
+{
+	struct objcore *oc;
+
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	oc = ctx->bo->fetch_objcore;
+	if (a < 0.0)
+		a = 0.0;
+	oc->stale_if_error = a;
+	update_t_stale_if_error(oc);
+	VSLb(ctx->vsl, SLT_TTL, "VCL %.0f %.0f %.0f %.0f %s",
+	    oc->ttl, oc->grace, oc->keep, oc->t_origin,
+	    ctx->bo->uncacheable ? "uncacheable" : "cacheable");
+}
+
 VRT_DO_EXP_R(beresp, ctx->bo->fetch_objcore, stale_if_error, 0)
+
+VCL_DURATION
+VRT_r_beresp_stale_if_error_remaining(VRT_CTX)
+{
+	double d;
+
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(ctx->bo, BUSYOBJ_MAGIC);
+	CHECK_OBJ_NOTNULL(ctx->bo->fetch_objcore, OBJCORE_MAGIC);
+	if (ctx->bo->fetch_objcore->t_stale_if_error <= 0)
+		return (0.0);
+	d = ctx->bo->fetch_objcore->t_stale_if_error - ttl_now(ctx);
+	if (d < 0.0)
+		d = 0.0;
+	return (d);
+}
 
 /*lint -restore */
 

@@ -489,6 +489,11 @@ vbf_stp_startfetch(struct worker *wrk, struct busyobj *bo)
 	    &oc->keep,
 	    &oc->stale_if_error);
 
+	if (oc->stale_if_error > 0)
+		oc->t_stale_if_error = oc->t_origin + oc->ttl + oc->stale_if_error;
+	else
+		oc->t_stale_if_error = 0;
+
 	AZ(bo->do_esi);
 	AZ(bo->was_304);
 
@@ -1058,6 +1063,7 @@ vbf_stp_stalefetch(struct worker *wrk, struct busyobj *bo)
 	oc->grace = grace;
 	oc->keep = stale_oc->keep;
 	oc->stale_if_error = stale_oc->stale_if_error;
+	oc->t_stale_if_error = stale_oc->t_stale_if_error;
 
 	if (vbf_beresp2obj(bo)) {
 		wrk->stats->fetch_failed++;
