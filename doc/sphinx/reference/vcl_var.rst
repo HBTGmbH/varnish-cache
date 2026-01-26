@@ -1553,7 +1553,18 @@ obj_stale.grace
 
 	Readable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
 
-	The stale object's grace period in seconds.
+	The stale object's remaining grace period in seconds.
+
+
+.. _obj_stale.grace_orig:
+
+obj_stale.grace_orig
+
+	Type: DURATION
+
+	Readable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
+
+	The stale object's original grace period in seconds.
 
 
 .. _obj_stale.hits:
@@ -1678,7 +1689,19 @@ obj_stale.ttl
 
 	Readable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
 
-	The stale object's time to live, in seconds.
+	The stale object's remaining time to live in seconds.
+
+
+.. _obj_stale.ttl_orig:
+
+obj_stale.ttl_orig
+
+	Type: DURATION
+
+	Readable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
+
+	The stale object's original time to live in seconds. Use this
+	to rearm a stale object with its original TTL.
 
 
 .. _obj_stale.uncacheable:
