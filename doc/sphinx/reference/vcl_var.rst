@@ -1397,38 +1397,6 @@ beresp.storage
 	round-robin fashion, or the `Transient` backend if
 	the object is short-lived.
 
-.. _beresp.stale_ttl:
-
-beresp.stale_ttl
-
-	Type: DURATION
-
-	Readable from: vcl_backend_response, vcl_backend_error
-
-	Writable from: vcl_backend_response, vcl_backend_error
-
-	Default: ``stale_rearm_ttl`` parameter value.
-
-	The TTL to set on the stale object when rearming via ``return(stale)``.
-	Only used when ``return(stale)`` is called. Requires feature
-	+revive_stale to be enabled.
-
-.. _beresp.stale_grace:
-
-beresp.stale_grace
-
-	Type: DURATION
-
-	Readable from: vcl_backend_response, vcl_backend_error
-
-	Writable from: vcl_backend_response, vcl_backend_error
-
-	Default: Original stale object's grace value.
-
-	The grace period to set on the stale object when rearming via
-	``return(stale)``. Only used when ``return(stale)`` is called.
-	Requires feature +revive_stale to be enabled.
-
 beresp.storage_hint	``VCL <= 4.0``
 
 	Type: STRING

@@ -439,10 +439,6 @@ struct busyobj {
 	vtim_dur		between_bytes_timeout;
 	vtim_dur		task_deadline;
 
-	/* Stale rearm parameters */
-	vtim_dur		stale_rearm_ttl;
-	vtim_dur		stale_rearm_grace;
-
 	/* Timers */
 	vtim_real		t_first;	/* First timestamp logged */
 	vtim_real		t_resp;		/* response received */

@@ -657,50 +657,6 @@ VRT_r_beresp_backend(VRT_CTX)
 	return (ctx->bo->director_resp);
 }
 
-/*--------------------------------------------------------------------
- * Stale rearm parameters for return(stale) in vcl_backend_*
- */
-
-VCL_DURATION
-VRT_r_beresp_stale_ttl(VRT_CTX)
-{
-
-	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-	CHECK_OBJ_NOTNULL(ctx->bo, BUSYOBJ_MAGIC);
-	return (ctx->bo->stale_rearm_ttl);
-}
-
-VCL_VOID
-VRT_l_beresp_stale_ttl(VRT_CTX, VCL_DURATION d)
-{
-
-	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-	CHECK_OBJ_NOTNULL(ctx->bo, BUSYOBJ_MAGIC);
-	if (d < 0)
-		d = 0;
-	ctx->bo->stale_rearm_ttl = d;
-}
-
-VCL_DURATION
-VRT_r_beresp_stale_grace(VRT_CTX)
-{
-
-	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-	CHECK_OBJ_NOTNULL(ctx->bo, BUSYOBJ_MAGIC);
-	return (ctx->bo->stale_rearm_grace);
-}
-
-VCL_VOID
-VRT_l_beresp_stale_grace(VRT_CTX, VCL_DURATION d)
-{
-
-	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-	CHECK_OBJ_NOTNULL(ctx->bo, BUSYOBJ_MAGIC);
-	if (d < 0)
-		d = 0;
-	ctx->bo->stale_rearm_grace = d;
-}
-
 /*--------------------------------------------------------------------*/
 
 VCL_VOID

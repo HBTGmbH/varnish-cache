@@ -1029,17 +1029,13 @@ vbf_stp_stalefetch(struct worker *wrk, struct busyobj *bo)
 
 	now = W_TIM_real(wrk);
 
-	/* Get rearm TTL from VCL setting or parameter default */
-	if (bo->stale_rearm_ttl > 0)
-		ttl = bo->stale_rearm_ttl;
-	else
-		ttl = cache_param->stale_rearm_ttl;
-
-	/* Get rearm grace from VCL setting or keep original */
-	if (bo->stale_rearm_grace > 0)
-		grace = bo->stale_rearm_grace;
-	else
-		grace = stale_oc->grace;
+	/* Use beresp.ttl and beresp.grace for the rearmed stale object.
+	 * VCL should set these before calling return(stale), typically:
+	 *   set beresp.ttl = obj_stale.ttl;
+	 *   set beresp.grace = obj_stale.grace;
+	 */
+	ttl = oc->ttl;
+	grace = oc->grace;
 
 	/* Rearm the stale object */
 	VSLb(bo->vsl, SLT_ExpKill, "VBF_StaleRearm x=%ju ttl=%.3f grace=%.3f",
