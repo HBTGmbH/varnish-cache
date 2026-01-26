@@ -62,6 +62,9 @@
  *	VRT_PROBE_string() added
  *	VRT_r_obj_stale_ttl_orig() added
  *	VRT_r_obj_stale_grace_orig() added
+ *	VRT_r_obj_stale_stale_if_error_remaining() added
+ *	VRT_r_obj_stale_if_error_remaining() added
+ *	VRT_r_beresp_stale_if_error_remaining() added
  * 22.0 (2025-09-15)
  *	VRT_r_obj_stale_age() added
  *	VRT_r_obj_stale_can_esi() added

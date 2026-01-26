@@ -1331,6 +1331,22 @@ beresp.stale_if_error
 	using ``return(stale)`` when the backend returns an error.
 
 
+.. _beresp.stale_if_error_remaining:
+
+beresp.stale_if_error_remaining
+
+	Type: DURATION
+
+	Readable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
+
+	The remaining time in the stale-if-error window for the current
+	backend response.
+
+	This is computed as the deadline (t_origin + ttl + stale_if_error)
+	minus the current time. Returns 0 if the window has expired or if
+	no stale-if-error was set.
+
+
 beresp.proto	``VCL <= 4.0``
 
 	Type: STRING
@@ -1496,7 +1512,9 @@ beresp.stale_exists
 	Example::
 
 	    sub vcl_backend_error {
-	        if (beresp.stale_exists && obj_stale.stale_if_error > 0s) {
+	        if (beresp.stale_exists &&
+	            obj_stale.stale_if_error_remaining > 0s) {
+	            set beresp.ttl = 10s;
 	            return (stale);
 	        }
 	    }
@@ -1615,9 +1633,35 @@ obj_stale.stale_if_error
 	The stale object's stale-if-error value in seconds.
 
 	This is the value from the original cached response, not the current
-	backend response. Use this in ``vcl_backend_response`` (for 5xx errors)
-	or ``vcl_backend_error`` (for connection failures) to decide whether
-	to ``return(stale)``.
+	backend response.
+
+
+.. _obj_stale.stale_if_error_remaining:
+
+obj_stale.stale_if_error_remaining
+
+	Type: DURATION
+
+	Readable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
+
+	The remaining time in the stale-if-error window.
+
+	This is computed as the deadline (original cache time + original TTL +
+	stale-if-error) minus the current time. Unlike
+	``obj_stale.stale_if_error``, this value correctly decreases over time
+	even after the stale object has been rearmed with ``return(stale)``.
+
+	Use this in ``vcl_backend_response`` (for 5xx errors) or
+	``vcl_backend_error`` (for connection failures) to decide whether to
+	``return(stale)``::
+
+	    sub vcl_backend_error {
+	        if (beresp.stale_exists &&
+	            obj_stale.stale_if_error_remaining > 0s) {
+	            set beresp.ttl = 10s;
+	            return (stale);
+	        }
+	    }
 
 
 .. _obj_stale.proto:
@@ -1817,6 +1861,21 @@ obj.stale_if_error
 
 	This indicates how long past TTL expiration stale content may be
 	served if the backend returns an error.
+
+
+.. _obj.stale_if_error_remaining:
+
+obj.stale_if_error_remaining
+
+	Type: DURATION
+
+	Readable from: vcl_hit, vcl_deliver
+
+	The remaining time in the stale-if-error window.
+
+	This is computed as the deadline (original cache time + original TTL +
+	stale-if-error) minus the current time. Returns 0 if the window has
+	expired or if no stale-if-error was set.
 
 
 .. _obj.proto:
