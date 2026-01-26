@@ -940,11 +940,43 @@ VRT_r_obj_stale_ttl(VRT_CTX)
 	return (d);
 }
 
+VCL_DURATION
+VRT_r_obj_stale_ttl_orig(VRT_CTX)
+{
+	double d;
+
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(ctx->bo, BUSYOBJ_MAGIC);
+	if (ctx->bo->stale_oc == NULL)
+		return (0.0);
+	CHECK_OBJ(ctx->bo->stale_oc, OBJCORE_MAGIC);
+	d = ctx->bo->stale_oc->ttl;
+	if (d <= 0.0)
+		d = 0.0;
+	return (d);
+}
+
 VRT_DO_EXP_R(obj, ctx->req->objcore, ttl,
     ttl_now(ctx) - ctx->req->objcore->t_origin)
 
 VCL_DURATION
 VRT_r_obj_stale_grace(VRT_CTX)
+{
+	double d;
+
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(ctx->bo, BUSYOBJ_MAGIC);
+	if (ctx->bo->stale_oc == NULL)
+		return (0.0);
+	CHECK_OBJ(ctx->bo->stale_oc, OBJCORE_MAGIC);
+	d = ctx->bo->stale_oc->grace;
+	if (d <= 0.0)
+		d = 0.0;
+	return (d);
+}
+
+VCL_DURATION
+VRT_r_obj_stale_grace_orig(VRT_CTX)
 {
 	double d;
 
