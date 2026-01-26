@@ -576,6 +576,14 @@ VRT_OC_VAR_R(obj, req, REQ_MAGIC, objcore)
  * in vcl_backend_response and vcl_backend_error where stale_oc may be NULL
  * (e.g., on first fetch, not a revalidation).
  */
+VCL_BOOL
+VRT_r_obj_stale_exists(VRT_CTX)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(ctx->bo, BUSYOBJ_MAGIC);
+	return (ctx->bo->stale_oc != NULL);
+}
+
 VCL_STEVEDORE
 VRT_r_obj_stale_storage(VRT_CTX)
 {

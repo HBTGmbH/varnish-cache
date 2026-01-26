@@ -1538,6 +1538,31 @@ obj_stale
 
 This is the stale object we had in cache. It cannot be modified.
 
+.. _obj_stale.exists:
+
+obj_stale.exists
+
+	Type: BOOL
+
+	Readable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
+
+	Returns ``true`` if a stale object exists for this request.
+
+	This is an alias for ``beresp.stale_exists``. Use this to check
+	whether ``return(stale)`` can be used and whether other ``obj_stale.*``
+	variables are accessible.
+
+	Example::
+
+	    sub vcl_backend_error {
+	        if (obj_stale.exists &&
+	            obj_stale.stale_if_error_remaining > 0s) {
+	            set beresp.ttl = 10s;
+	            return (stale);
+	        }
+	    }
+
+
 .. _obj_stale.age:
 
 obj_stale.age
