@@ -60,6 +60,7 @@
  * 22.1 (trunk)
  *	"vcl_name" member added to vrt_backend_probe{}
  *	VRT_PROBE_string() added
+ *	VRT_r_obj_stale_exists() added
  *	VRT_r_obj_stale_ttl_orig() added
  *	VRT_r_obj_stale_grace_orig() added
  *	VRT_r_obj_stale_stale_if_error_remaining() added
