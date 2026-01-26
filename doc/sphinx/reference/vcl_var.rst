@@ -1526,7 +1526,7 @@ obj_stale.age
 
 	Type: DURATION
 
-	Readable from: vcl_backend_refresh
+	Readable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
 
 	The age of the stale object.
 
@@ -1537,7 +1537,7 @@ obj_stale.can_esi
 
 	Type: BOOL
 
-	Readable from: vcl_backend_refresh
+	Readable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
 
 	If the stale object can be ESI processed, that is if setting
 	``resp.do_esi`` or adding ``esi`` to ``resp.filters`` in
@@ -1551,7 +1551,7 @@ obj_stale.grace
 
 	Type: DURATION
 
-	Readable from: vcl_backend_refresh
+	Readable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
 
 	The stale object's grace period in seconds.
 
@@ -1562,7 +1562,7 @@ obj_stale.hits
 
 	Type: INT
 
-	Readable from: vcl_backend_refresh
+	Readable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
 
 	The count of cache-hits on this stale object.
 
@@ -1575,7 +1575,7 @@ obj_stale.http.*
 
 	Type: HEADER
 
-	Readable from: vcl_backend_refresh
+	Readable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
 
 	The HTTP headers stored in the stale object.
 
@@ -1588,7 +1588,7 @@ obj_stale.keep
 
 	Type: DURATION
 
-	Readable from: vcl_backend_refresh
+	Readable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
 
 	The stale object's keep period in seconds.
 
@@ -1615,7 +1615,7 @@ obj_stale.proto
 
 	Type: STRING
 
-	Readable from: vcl_backend_refresh
+	Readable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
 
 	The HTTP protocol version stored in the stale object.
 
@@ -1626,7 +1626,7 @@ obj_stale.reason
 
 	Type: STRING
 
-	Readable from: vcl_backend_refresh
+	Readable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
 
 
 	The HTTP reason phrase stored in the stale object.
@@ -1638,7 +1638,7 @@ obj_stale.status
 
 	Type: INT
 
-	Readable from: vcl_backend_refresh
+	Readable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
 
 
 	The HTTP status code stored in the stale object.
@@ -1652,7 +1652,7 @@ obj_stale.storage
 
 	Type: STEVEDORE
 
-	Readable from: vcl_backend_refresh
+	Readable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
 
 	The storage backend where this stale object is stored.
 
@@ -1663,7 +1663,7 @@ obj_stale.time
 
 	Type: TIME
 
-	Readable from: vcl_backend_refresh
+	Readable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
 
 	The time the stale object was created from the perspective of the
 	server which generated it. This will roughly be equivalent to
@@ -1676,7 +1676,7 @@ obj_stale.ttl
 
 	Type: DURATION
 
-	Readable from: vcl_backend_refresh
+	Readable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
 
 	The stale object's time to live, in seconds.
 
@@ -1687,7 +1687,7 @@ obj_stale.uncacheable
 
 	Type: BOOL
 
-	Readable from: vcl_backend_refresh
+	Readable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
 
 	Whether the stale object is uncacheable (pass, hit-for-pass or
 	hit-for-miss).
@@ -1698,7 +1698,7 @@ obj_stale.is_valid
 
 	Type: BOOL
 
-	Readable from: vcl_backend_refresh
+	Readable from: vcl_backend_response, vcl_backend_error, vcl_backend_refresh
 
 	Whether the stale object is still valid.
 
