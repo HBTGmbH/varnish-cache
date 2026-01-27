@@ -1,0 +1,90 @@
+varnishtest "Test vmod_acceptnorm - best_match, quality, accepts"
+
+varnish v1 -vcl {
+	import acceptnorm;
+	backend be none;
+	sub vcl_recv { return (synth(200)); }
+	sub vcl_synth {
+		# Test best_match - find single best type
+		set resp.http.X-best1 = acceptnorm.best_match(
+			"text/html, application/json;q=0.9",
+			"application/json, text/html");
+		# text/html has q=1.0, json has q=0.9, so html wins
+
+		set resp.http.X-best2 = acceptnorm.best_match(
+			"application/json, text/html;q=0.5",
+			"text/html, application/json");
+		# json has q=1.0, html has q=0.5, json wins
+		# (server prefers html first, but json has higher quality)
+
+		set resp.http.X-best3 = acceptnorm.best_match(
+			"*/*",
+			"application/json, text/html");
+		# Wildcard accepts both, both have same quality
+		# Should return first preferred: application/json
+
+		# Test quality function
+		set resp.http.X-quality1 = acceptnorm.quality(
+			"text/html, application/json;q=0.8", "text/html");
+		# Should be 1.0
+
+		set resp.http.X-quality2 = acceptnorm.quality(
+			"text/html, application/json;q=0.8", "application/json");
+		# Should be 0.8
+
+		set resp.http.X-quality3 = acceptnorm.quality(
+			"text/html, application/json;q=0.8", "text/plain");
+		# Not in list, should be 0.0
+
+		set resp.http.X-quality4 = acceptnorm.quality(
+			"text/*, application/json", "text/plain");
+		# Matches text/* wildcard, should be 1.0
+
+		set resp.http.X-quality5 = acceptnorm.quality(
+			"*/*;q=0.1", "anything/here");
+		# Matches */* with q=0.1
+
+		# Test accepts function
+		if (acceptnorm.accepts("text/html, application/json", "text/html")) {
+			set resp.http.X-accepts1 = "yes";
+		} else {
+			set resp.http.X-accepts1 = "no";
+		}
+
+		if (acceptnorm.accepts("text/html, application/json", "text/plain")) {
+			set resp.http.X-accepts2 = "yes";
+		} else {
+			set resp.http.X-accepts2 = "no";
+		}
+
+		if (acceptnorm.accepts("text/*", "text/plain")) {
+			set resp.http.X-accepts3 = "yes";
+		} else {
+			set resp.http.X-accepts3 = "no";
+		}
+
+		# Test q=0 means not accepted
+		if (acceptnorm.accepts("text/html;q=0, application/json", "text/html")) {
+			set resp.http.X-accepts4 = "yes";
+		} else {
+			set resp.http.X-accepts4 = "no";
+		}
+	}
+} -start
+
+client c1 {
+	txreq -url "/"
+	rxresp
+	expect resp.http.X-best1 == "text/html"
+	expect resp.http.X-best2 == "application/json"
+	expect resp.http.X-best3 == "application/json"
+	expect resp.http.X-quality1 == "1.000"
+	expect resp.http.X-quality2 == "0.800"
+	expect resp.http.X-quality3 == "0.000"
+	expect resp.http.X-quality4 == "1.000"
+	expect resp.http.X-quality5 == "0.100"
+	expect resp.http.X-accepts1 == "yes"
+	expect resp.http.X-accepts2 == "no"
+	expect resp.http.X-accepts3 == "yes"
+	expect resp.http.X-accepts4 == "no"
+} -run

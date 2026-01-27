@@ -1,0 +1,55 @@
+varnishtest "Test vmod_acceptnorm - cache normalization scenario"
+
+# This test demonstrates how the acceptnorm vmod improves cache hit rates
+# by normalizing Accept headers from different clients to the same form
+
+server s1 {
+	rxreq
+	expect req.http.Accept == "application/json, text/html"
+	txresp -body "response1"
+
+	# Second request should be a cache hit, so no second server request
+} -start
+
+varnish v1 -vcl+backend {
+	import acceptnorm;
+
+	sub vcl_recv {
+		# Normalize Accept header for better cache hits
+		if (req.http.Accept) {
+			set req.http.Accept = acceptnorm.filter(req.http.Accept,
+				"application/json, text/html, text/plain");
+		}
+	}
+
+	sub vcl_hash {
+		hash_data(req.http.Accept);
+	}
+} -start
+
+client c1 {
+	# First client sends Accept in one order
+	txreq -url "/" -hdr "Accept: text/html, application/json, image/png"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "response1"
+} -run
+
+client c2 {
+	# Second client sends Accept in different order - should be cache hit
+	# because after normalization both become "application/json, text/html"
+	txreq -url "/" -hdr "Accept: application/json, text/html;q=1.0"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "response1"
+} -run
+
+client c3 {
+	# Third client uses wildcards - still matches same normalized form
+	txreq -url "/" -hdr "Accept: text/*, application/*"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "response1"
+} -run
+
+varnish v1 -expect cache_hit == 2
