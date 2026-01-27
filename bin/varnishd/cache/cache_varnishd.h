@@ -122,6 +122,7 @@ typedef enum htc_status_e htc_complete_f(struct http_conn *);
 /* -------------------------------------------------------------------*/
 
 extern volatile struct params * cache_param;
+extern volatile unsigned cache_draining;
 
 /* -------------------------------------------------------------------
  * The VCF facility is deliberately undocumented, use at your peril.

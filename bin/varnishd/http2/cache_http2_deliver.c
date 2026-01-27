@@ -331,6 +331,11 @@ h2_deliver(struct req *req, int sendbody)
 	r2->t_send = req->t_prev;
 
 	H2_Send_Get(req->wrk, r2->h2sess, r2);
+
+	/* If draining, send GOAWAY to signal no new streams */
+	if (cache_draining && !r2->h2sess->goaway)
+		H2_Send_GOAWAY(req->wrk, r2->h2sess, r2, H2CE_NO_ERROR);
+
 	H2_Send(req->wrk, r2, H2_F_HEADERS,
 	    (sendbody ? 0 : H2FF_HEADERS_END_STREAM) | H2FF_HEADERS_END_HEADERS,
 	    sz, r, &req->acct.resp_hdrbytes);

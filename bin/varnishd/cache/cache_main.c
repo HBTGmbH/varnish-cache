@@ -54,6 +54,7 @@
 #include "hash/hash_slinger.h"
 
 volatile struct params		*cache_param;
+volatile unsigned		cache_draining = 0;
 static pthread_mutex_t		cache_vrnd_mtx;
 static vtim_dur			shutdown_delay = 0;
 

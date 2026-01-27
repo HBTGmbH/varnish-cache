@@ -115,9 +115,20 @@ CLI_Run(void)
 
 /*--------------------------------------------------------------------*/
 
+static void v_matchproto_(cli_func_t)
+ccf_drain(struct cli *cli, const char * const *av, void *priv)
+{
+	(void)cli;
+	(void)av;
+	(void)priv;
+	cache_draining = 1;
+	VCLI_Out(cli, "Connection draining enabled");
+}
+
 static struct cli_proto cli_cmds[] = {
 	{ CLICMD_PING,	"i", VCLS_func_ping, VCLS_func_ping_json },
 	{ CLICMD_HELP,	"i", VCLS_func_help, VCLS_func_help_json },
+	{ CLICMD_SERVER_DRAIN,	"", ccf_drain },
 	{ NULL }
 };
 
