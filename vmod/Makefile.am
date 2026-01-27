@@ -28,6 +28,7 @@ noinst_LTLIBRARIES =
 dist_vcc_DATA =
 dist_noinst_DATA =
 
+include $(srcdir)/automake_boilerplate_acceptnorm.am
 include $(srcdir)/automake_boilerplate_blob.am
 include $(srcdir)/automake_boilerplate_h2.am
 include $(srcdir)/automake_boilerplate_cookie.am

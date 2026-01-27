@@ -1,0 +1,41 @@
+varnishtest "Test vmod_acceptnorm - canonicalize"
+
+varnish v1 -vcl {
+	import acceptnorm;
+	backend be none;
+	sub vcl_recv { return (synth(200)); }
+	sub vcl_synth {
+		# Test basic canonicalization - should sort alphabetically for same quality
+		set resp.http.X-canon1 = acceptnorm.canonicalize(
+			"application/json, text/html");
+		# Should become: application/json, text/html (already alpha sorted, both q=1.0)
+
+		# Test with different qualities - should sort by quality desc
+		set resp.http.X-canon2 = acceptnorm.canonicalize(
+			"text/html;q=0.5, application/json;q=0.9");
+		# Should become: application/json;q=0.9, text/html;q=0.5
+
+		# Test mixed qualities with same q values sorted alphabetically
+		set resp.http.X-canon3 = acceptnorm.canonicalize(
+			"text/plain, application/xml, text/html, application/json");
+		# Should become: application/json, application/xml, text/html, text/plain
+
+		# Test with whitespace and quality values
+		set resp.http.X-canon4 = acceptnorm.canonicalize(
+			"  text/html  ,  application/json ; q=0.8  , text/plain;q=0.8");
+		# Should become: text/html, application/json;q=0.8, text/plain;q=0.8
+
+		# Test empty header
+		set resp.http.X-canon5 = acceptnorm.canonicalize("");
+	}
+} -start
+
+client c1 {
+	txreq -url "/"
+	rxresp
+	expect resp.http.X-canon1 == "application/json, text/html"
+	expect resp.http.X-canon2 == "application/json;q=0.9, text/html;q=0.5"
+	expect resp.http.X-canon3 == "application/json, application/xml, text/html, text/plain"
+	expect resp.http.X-canon4 == "text/html, application/json;q=0.8, text/plain;q=0.8"
+	expect resp.http.X-canon5 == ""
+} -run

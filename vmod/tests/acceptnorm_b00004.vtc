@@ -1,0 +1,64 @@
+varnishtest "Test vmod_acceptnorm - prefer"
+
+varnish v1 -vcl {
+	import acceptnorm;
+	backend be none;
+	sub vcl_recv { return (synth(200)); }
+	sub vcl_synth {
+		# Test basic prefer - first preferred that matches
+		set resp.http.X-prefer1 = acceptnorm.prefer(
+			"text/html, text/plain, image/png",
+			"application/json, text/html");
+		# text/html is in Accept, should return "text/html"
+
+		# Test prefer with different order
+		set resp.http.X-prefer2 = acceptnorm.prefer(
+			"text/plain, application/json, image/png",
+			"text/html, application/json");
+		# text/html not in Accept, but application/json is
+		# Should return "application/json"
+
+		# Test no match - should return original Accept header
+		set resp.http.X-prefer3 = acceptnorm.prefer(
+			"image/png, image/jpeg",
+			"application/json, text/html");
+		# Neither preferred is in Accept, return original
+
+		# Test with wildcards in Accept header
+		set resp.http.X-prefer4 = acceptnorm.prefer(
+			"text/*, application/xml",
+			"text/html, application/json");
+		# text/* matches text/html, should return "text/html"
+
+		# Test with q=0 (explicitly not accepted)
+		set resp.http.X-prefer5 = acceptnorm.prefer(
+			"text/html;q=0, application/json",
+			"text/html, application/json");
+		# text/html has q=0 so not accepted, application/json matches
+		# Should return "application/json"
+
+		# Test empty Accept header
+		set resp.http.X-prefer6 = acceptnorm.prefer(
+			"",
+			"application/json, text/html");
+		# Empty Accept, should return empty
+
+		# Test empty preferred list - return original
+		set resp.http.X-prefer7 = acceptnorm.prefer(
+			"text/html, application/json",
+			"");
+		# No preferred types, return original
+	}
+} -start
+
+client c1 {
+	txreq -url "/"
+	rxresp
+	expect resp.http.X-prefer1 == "text/html"
+	expect resp.http.X-prefer2 == "application/json"
+	expect resp.http.X-prefer3 == "image/png, image/jpeg"
+	expect resp.http.X-prefer4 == "text/html"
+	expect resp.http.X-prefer5 == "application/json"
+	expect resp.http.X-prefer6 == ""
+	expect resp.http.X-prefer7 == "text/html, application/json"
+} -run

@@ -1,0 +1,164 @@
+#-
+# Copyright (c) 2024 Varnish Software AS
+# All rights reserved.
+#
+# SPDX-License-Identifier: BSD-2-Clause
+
+$Module acceptnorm 3 "Varnish Accept Header Normalization Module"
+
+DESCRIPTION
+===========
+
+Handle HTTP Accept headers for cache normalization.
+
+This module parses Accept headers, canonicalizes them for better cache hit
+rates, and can reduce them to server-preferred media types.
+
+The canonicalization sorts media types by quality value (descending), then
+alphabetically within the same quality level. This ensures that equivalent
+Accept headers from different clients result in the same normalized form.
+
+The filter functionality reduces the Accept header to only include
+server-preferred media types, improving cache efficiency by reducing
+variation.
+
+Example::
+
+	import acceptnorm;
+
+	sub vcl_recv {
+	    if (req.http.accept) {
+	        # Simple one-liner: canonicalize and filter to preferred types
+	        set req.http.accept = acceptnorm.filter(req.http.accept,
+	            "text/html, application/json, application/xml");
+	    }
+	}
+
+Or with more control::
+
+	import acceptnorm;
+
+	sub vcl_recv {
+	    if (req.http.accept) {
+	        set req.http.accept = acceptnorm.canonicalize(req.http.accept);
+	    }
+	}
+
+$ABI strict
+
+$Function STRING filter(PRIV_TASK, STRING accept_header, STRING preferred)
+
+Parse the Accept header, filter to only include media types that match
+the server-preferred list, and return a canonicalized string.
+
+The ``preferred`` argument is a comma-separated list of media types that
+the server supports. The returned string will only include media types
+from the Accept header that match one of the preferred types (including
+wildcard matching).
+
+The result is sorted by quality (descending), then alphabetically within
+the same quality level.
+
+If no preferred types match, returns the first preferred type as a
+fallback.
+
+Example::
+
+	sub vcl_recv {
+	    set req.http.accept = acceptnorm.filter(req.http.accept,
+	        "application/json, text/html, text/plain");
+	}
+
+$Function STRING canonicalize(PRIV_TASK, STRING accept_header)
+
+Parse and canonicalize an Accept header string.
+
+Returns the Accept header with media types sorted by:
+1. Quality value (descending, highest first)
+2. Alphabetically within the same quality level
+
+This normalization improves cache hit rates by ensuring equivalent
+Accept headers produce identical strings.
+
+Example::
+
+	sub vcl_recv {
+	    # "text/html, application/json;q=0.9" and
+	    # "application/json;q=0.9, text/html" both become
+	    # "text/html, application/json;q=0.9"
+	    set req.http.accept = acceptnorm.canonicalize(req.http.accept);
+	}
+
+$Function STRING best_match(PRIV_TASK, STRING accept_header, STRING preferred)
+
+Find the best matching media type from the preferred list based on the
+Accept header.
+
+Returns the single best matching media type from ``preferred`` that the
+client accepts, considering quality values. Returns the first preferred
+type as fallback if no match is found.
+
+Example::
+
+	sub vcl_recv {
+	    # Get the single best content type to serve
+	    set req.http.x-content-type = acceptnorm.best_match(req.http.accept,
+	        "application/json, text/html");
+	}
+
+$Function STRING prefer(PRIV_TASK, STRING accept_header, STRING preferred)
+
+Select the first preferred media type that the client accepts.
+
+Iterates through the ``preferred`` list (left to right) and returns the
+first type that appears in the Accept header with quality > 0.
+
+If none of the preferred types match, returns the original Accept header
+unchanged. This is useful when you want to normalize to a preferred type
+if possible, but preserve the original header for unknown clients.
+
+Example::
+
+	sub vcl_recv {
+	    # If client accepts JSON or HTML, normalize to that.
+	    # Otherwise keep original Accept header.
+	    set req.http.accept = acceptnorm.prefer(req.http.accept,
+	        "application/json, text/html");
+	}
+
+	# Input: "text/html, text/plain, image/png"
+	# Output: "text/html" (first preferred that matches)
+
+	# Input: "image/png, image/jpeg"
+	# Output: "image/png, image/jpeg" (no preferred matches, unchanged)
+
+$Function REAL quality(PRIV_TASK, STRING accept_header, STRING media_type)
+
+Get the quality value for a specific media type from an Accept header.
+
+Returns the quality value (0.0 to 1.0) for the given media type.
+Returns 0.0 if the media type is not accepted.
+Considers wildcard matches (e.g., ``*/*`` or ``text/*``).
+
+Example::
+
+	sub vcl_recv {
+	    if (acceptnorm.quality(req.http.accept, "application/json") > 0.5) {
+	        # Client strongly prefers JSON
+	    }
+	}
+
+$Function BOOL accepts(PRIV_TASK, STRING accept_header, STRING media_type)
+
+Check if a media type is accepted.
+
+Returns true if the Accept header includes the given media type
+(directly or via wildcard) with a quality > 0.
+
+Example::
+
+	sub vcl_recv {
+	    if (acceptnorm.accepts(req.http.accept, "application/json")) {
+	        # Client accepts JSON
+	    }
+	}

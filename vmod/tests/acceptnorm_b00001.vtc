@@ -1,0 +1,56 @@
+varnishtest "Test vmod_acceptnorm - filter"
+
+varnish v1 -vcl {
+	import acceptnorm;
+	backend be none;
+	sub vcl_recv { return (synth(200)); }
+	sub vcl_synth {
+		# Test basic filtering - reduce to server-preferred types
+		set resp.http.X-filter1 = acceptnorm.filter(
+			"text/html, application/json, text/plain, application/xml",
+			"application/json, text/html");
+		# Client accepts all 4, server prefers json and html
+		# Should return: application/json, text/html (both q=1.0, alpha sorted)
+
+		# Test with quality values
+		set resp.http.X-filter2 = acceptnorm.filter(
+			"text/html;q=0.5, application/json;q=0.9, text/plain",
+			"application/json, text/html, text/plain");
+		# Should return types with their original qualities, sorted
+
+		# Test wildcard matching - */* should match any preferred type
+		set resp.http.X-filter3 = acceptnorm.filter(
+			"*/*",
+			"application/json, text/html");
+		# Client accepts anything, should return both preferred types
+
+		# Test type/* wildcard
+		set resp.http.X-filter4 = acceptnorm.filter(
+			"text/*;q=0.8, application/json",
+			"text/html, text/plain, application/json");
+		# text/* matches text/html and text/plain with q=0.8, json has q=1.0
+
+		# Test no matches - should return first preferred as fallback
+		set resp.http.X-filter5 = acceptnorm.filter(
+			"image/png, image/jpeg",
+			"application/json, text/html");
+		# Client only accepts images, but server prefers json/html
+		# Fallback to first preferred: application/json
+
+		# Test empty accept header - return first preferred
+		set resp.http.X-filter6 = acceptnorm.filter(
+			"",
+			"application/json, text/html");
+	}
+} -start
+
+client c1 {
+	txreq -url "/"
+	rxresp
+	expect resp.http.X-filter1 == "application/json, text/html"
+	expect resp.http.X-filter2 == "text/plain, application/json;q=0.9, text/html;q=0.5"
+	expect resp.http.X-filter3 == "application/json, text/html"
+	expect resp.http.X-filter4 == "application/json, text/html;q=0.8, text/plain;q=0.8"
+	expect resp.http.X-filter5 == "application/json"
+	expect resp.http.X-filter6 == "application/json"
+} -run
